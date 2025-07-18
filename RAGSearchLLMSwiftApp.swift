@@ -11,7 +11,7 @@ import SwiftUI
 struct RAGSearchLLMSwiftApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RAGView()
         }
     }
 }
