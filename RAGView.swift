@@ -33,11 +33,12 @@ func generateRandomSentence() -> String {
 struct RAGView: View {
     let collectionName: String = "testCollection"
     @State private var collection: Collection?
-    @State private var query: String = "emotions"
+    @State private var query: String = "wordss"
     @State private var newEntry: String = ""
     @State private var neighbors: [(String, Double)] = []
     @State private var userLLMQuery: String = ""
     @State private var userLLMResponse: String.PartiallyGenerated = ""
+    @State private var session: LanguageModelSession = LanguageModelSession()
 
     var body: some View {
         VStack {
@@ -56,14 +57,6 @@ struct RAGView: View {
             }
             .padding()
 
-            Button("Find Neighbors") {
-                self.neighbors.removeAll()
-                Task {
-                    await findNeighbors()
-                    print("CURRENT NEIGHBORS: -----------------------------------\n", neighbors)
-                }
-            }
-
             Button("Generate Random Embeddings") {
                 Task {
                     await generateRandomEmbeddings()
@@ -74,12 +67,20 @@ struct RAGView: View {
                 TextField("User LLM Query", text: $userLLMQuery)
                     .padding()
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button("Query LLM") {
+            }
+            HStack {
+                Button("RAG LLM") {
                     Task {
                         try await queryLLM()
                     }
-                }
+                }.padding()
+                Button("Web Search") {
+                    Task {
+                        try await webSearch()
+                    }
+                }.padding()
             }
+            
             TextEditor(text: $userLLMResponse)
                 .frame(minHeight: 100, maxHeight: 250)
                 .padding(4)
@@ -104,8 +105,13 @@ struct RAGView: View {
         }
     }
     
+    func webSearch() async throws {
+        // Web scrape the top 3 websites according to user prompt
+        // Then, scrape each individual website within character count limit
+        // Then, provide the title and content as context in the LLM prompt
+    }
+    
     func queryLLM() async throws {
-        let session: LanguageModelSession = LanguageModelSession()
         await findLLMNeighbors()
         let prompt = """
                 You are a helpful assistant that answers questions based on the provided context.
@@ -126,6 +132,7 @@ struct RAGView: View {
         for try await partialStream in responseStream {
             userLLMResponse = partialStream
         }
+        
     }
 
     func loadCollection() async {
@@ -183,25 +190,17 @@ struct RAGView: View {
 
         return vectorAverage
     }
-
-    func findNeighbors() async {
-        guard let collection = collection else { return }
-        guard let queryEmbedding = generateEmbedding(for: query) else {
-            return
-        }
-
-        let results = collection.search(query: queryEmbedding, num_results: 5)
-        neighbors = results.map { ($0.text, $0.score) }
-    }
     
     func findLLMNeighbors() async {
         guard let collection = collection else { return }
         guard let queryEmbedding = generateEmbedding(for: userLLMQuery) else {
             return
         }
+        
 
-        let results = collection.search(query: queryEmbedding)
+        let results = collection.search(query: queryEmbedding, num_results: 5)
         neighbors = results.map { ($0.text, $0.score) }
+        print("NEIGHBORS: ", neighbors)
     }
 }
 
