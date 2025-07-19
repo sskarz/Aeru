@@ -88,6 +88,7 @@ class WebSearchService {
         return parseSearchResults(from: html)
     }
     
+    // Parse Search Results at 2
     private func parseSearchResults(from html: String) -> [(title: String, url: String)] {
         var results: [(title: String, url: String)] = []
         let lines = html.components(separatedBy: .newlines)
@@ -96,14 +97,14 @@ class WebSearchService {
             if line.contains("result__a") && line.contains("href=") {
                 if let result = parseResultLine(line) {
                     results.append(result)
-                    if results.count >= 3 {
+                    if results.count >= 2 {
                         break
                     }
                 }
             }
         }
         
-        // Fallback parsing if no results found
+        // Fallback parsing if no results are found
         if results.isEmpty {
             results = parseAlternativeResults(from: html)
         }
@@ -139,7 +140,7 @@ class WebSearchService {
             if line.contains("href=") && (line.contains("http://") || line.contains("https://")) {
                 if let result = parseAnyLinkLine(line) {
                     results.append(result)
-                    if results.count >= 3 {
+                    if results.count >= 2 {
                         break
                     }
                 }
@@ -260,8 +261,9 @@ class WebSearchService {
             try doc.select("[class*=cookie]").remove()
             try doc.select("[class*=popup]").remove()
             
+            // Play around with maxLength
             var allText = ""
-            let maxLength = 4000
+            let maxLength = 1000
             
             // Extract text from paragraphs
             let paragraphs = try doc.select("p")
@@ -342,6 +344,7 @@ class WebSearchService {
     }
 }
 
+// Main view
 struct RAGView: View {
     let collectionName: String = "testCollection"
     @State private var collection: Collection?
@@ -468,14 +471,13 @@ struct RAGView: View {
         let webContext = results.map { result in
             """
             Title: \(result.title)
-            URL: \(result.url)
             Content: \(result.content)
             """
         }.joined(separator: "\n\n---\n\n")
         
         // Create enhanced prompt with web context
         let prompt = """
-                You are a helpful assistant that answers questions based on both web search results and provided context.
+                You are a helpful assistant that answers questions based on web search results.
                 
                 Web Search Results:
                 \(webContext)
@@ -483,7 +485,7 @@ struct RAGView: View {
                 Question: \(userLLMQuery)
                 
                 Instructions:
-                1. Answer based primarily on the web search results above
+                1. Answer concisely based primarily on the web search results above
                 2. Be accurate and cite the sources when possible
                 3. If the web results don't contain enough information, say so
                 4. Provide a comprehensive and informative response
