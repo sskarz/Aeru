@@ -11,6 +11,7 @@ import NaturalLanguage
 import SVDB
 import SwiftUI
 import FoundationModels
+import SwiftSoup
 
 struct EmbeddingEntry: Codable {
     let id: UUID
