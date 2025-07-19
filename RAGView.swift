@@ -4,7 +4,7 @@
 //
 //  Created by Sanskar Thapa on July 15th, 2025.
 //
-
+// Resetting
 import Accelerate
 import CoreML
 import NaturalLanguage
@@ -45,7 +45,7 @@ class WebSearchService {
             // Get search results from DuckDuckGo search engine
             let searchResults = try await performSearch(query: query)
             
-            // Scrape each website
+            // Scrape each website content
             var webResults: [WebSearchResult] = []
             
             for (index, result) in searchResults.enumerated() {
@@ -263,7 +263,7 @@ class WebSearchService {
             
             // Play around with maxLength
             var allText = ""
-            let maxLength = 1000
+            let maxLength = 800
             
             // Extract text from paragraphs
             let paragraphs = try doc.select("p")
@@ -551,6 +551,7 @@ struct RAGView: View {
         print("Done creating")
     }
 
+    // addentry reset the state reset the state
     func addEntry(_ entry: String) async {
         guard let collection = collection else { return }
         guard let embedding = generateEmbedding(for: entry) else {
