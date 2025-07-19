@@ -2,7 +2,7 @@
 //  RAGView.swift
 //  SVDBDemo
 //
-//  Created by Sanskar Thapa on July 18th, 2025.
+//  Created by Sanskar Thapa on July 15th, 2025.
 //
 
 import Accelerate
@@ -108,7 +108,7 @@ struct RAGView: View {
     func webSearch() async throws {
         // Web scrape the top 3 websites according to user prompt
         // Then, scrape each individual website within character count limit
-        // Then, provide the title and content as context in the LLM prompt
+        // Then, provide the title and content as context in the LLM prompt, and generate the response
     }
     
     func queryLLM() async throws {
