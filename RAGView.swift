@@ -345,7 +345,7 @@ class WebSearchService {
 struct RAGView: View {
     let collectionName: String = "testCollection"
     @State private var collection: Collection?
-    @State private var query: String = "wordss"
+    @State private var query: String = ""
     @State private var newEntry: String = ""
     @State private var neighbors: [(String, Double)] = []
     @State private var userLLMQuery: String = ""
@@ -357,7 +357,7 @@ struct RAGView: View {
 
     var body: some View {
         VStack {
-            TextField("Enter query", text: $query)
+            TextField("Enter RAG Vector query", text: $query)
                 .padding()
                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
@@ -432,7 +432,7 @@ struct RAGView: View {
             }
             
             TextEditor(text: $userLLMResponse)
-                .frame(minHeight: 100, maxHeight: 250)
+                .frame(minHeight: 100)
                 .padding(4)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -456,6 +456,7 @@ struct RAGView: View {
     }
     
     func webSearch() async throws {
+        userLLMResponse = ""
         isWebSearching = true
         webSearchResults = []
         
@@ -489,6 +490,7 @@ struct RAGView: View {
                 
                 Answer:
                 """
+        print("WEB SEARCH PROMPT: \n", prompt)
         
         // Generate response using LLM
         let responseStream = session.streamResponse(to: prompt)
@@ -500,6 +502,7 @@ struct RAGView: View {
     }
     
     func queryLLM() async throws {
+        userLLMResponse = ""
         await findLLMNeighbors()
         webSearchResults = [] // Clear web search results when using RAG
         
