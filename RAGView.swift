@@ -2,7 +2,7 @@
 //  RAGView.swift
 //  SVDBDemo
 //
-//  Created by Jordan Howlett on 8/4/23.
+//  Created by Sanskar Thapa on July 18th, 2025.
 //
 
 import Accelerate
