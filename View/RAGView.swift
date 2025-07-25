@@ -53,10 +53,7 @@ struct RAGView: View {
                                 .id(message.id)
                         }
                         
-                        // Loading indicator
-                        if llm.isWebSearching || llm.userLLMResponse != nil {
-                            TypingIndicatorView()
-                        }
+                        
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -107,11 +104,23 @@ struct RAGView: View {
             
             // Mode toggles
             HStack(spacing: 20) {
-                Toggle("RAG Mode", isOn: $useRAG)
-                    .toggleStyle(SwitchToggleStyle(tint: .green))
+                Toggle("RAG Mode", isOn: Binding(
+                    get: { useRAG },
+                    set: { newValue in
+                        useRAG = newValue
+                        if newValue { useWebSearch = false }
+                    }
+                ))
+                .toggleStyle(SwitchToggleStyle(tint: .green))
                 
-                Toggle("Web Search", isOn: $useWebSearch)
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                Toggle("Web Search", isOn: Binding(
+                    get: { useWebSearch },
+                    set: { newValue in
+                        useWebSearch = newValue
+                        if newValue { useRAG = false }
+                    }
+                ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
             }
             .font(.subheadline)
             
@@ -245,39 +254,6 @@ struct ChatBubbleView: View {
     }
 }
 
-struct TypingIndicatorView: View {
-    @State private var animating = false
-    
-    var body: some View {
-        HStack {
-            HStack(spacing: 4) {
-                ForEach(0..<3) { index in
-                    Circle()
-                        .fill(Color.gray)
-                        .frame(width: 6, height: 6)
-                        .scaleEffect(animating ? 1.0 : 0.5)
-                        .animation(
-                            Animation.easeInOut(duration: 0.6)
-                                .repeatForever()
-                                .delay(Double(index) * 0.2),
-                            value: animating
-                        )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemGray5))
-            )
-            
-            Spacer(minLength: 50)
-        }
-        .onAppear {
-            animating = true
-        }
-    }
-}
 
 struct KnowledgeBaseView: View {
     let llm: LLM
