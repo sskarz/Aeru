@@ -18,8 +18,8 @@ class LLM: ObservableObject {
     
     // Contains all the generation and invokes RAGModel.swift and WebSearchService.swift
     
-    // RAG
-    var rag: RAGModel = RAGModel(collectionName: "dog")
+    // RAG - now managed per chat session
+    private var ragModels: [String: RAGModel] = [:]
     
     // LLM Generation
     @Published var userLLMQuery: String = ""
@@ -30,13 +30,61 @@ class LLM: ObservableObject {
     @Published var isWebSearching = false
     @Published var webSearchResults: [WebSearchResult] = []
     
+    // Chat session management
+    @Published var chatMessages: [ChatMessage] = []
+    private var currentSessionId: String?
+    private let databaseManager = DatabaseManager.shared
+    
     private var session: LanguageModelSession = LanguageModelSession()
     
-    func webSearch(_ UIQuery: String) async throws {
+    // Get or create RAG model for current session
+    private func getRagForSession(_ sessionId: String, collectionName: String) -> RAGModel {
+        if let existingRAG = ragModels[sessionId] {
+            return existingRAG
+        }
+        
+        let newRAG = RAGModel(collectionName: collectionName)
+        ragModels[sessionId] = newRAG
+        return newRAG
+    }
+    
+    func switchToSession(_ session: ChatSession) {
+        currentSessionId = session.id
+        loadMessagesForCurrentSession()
+    }
+    
+    func loadMessagesForCurrentSession() {
+        guard let sessionId = currentSessionId else {
+            chatMessages = []
+            return
+        }
+        
+        chatMessages = databaseManager.getMessages(for: sessionId)
+    }
+    
+    func addEntry(_ entry: String, to session: ChatSession) async {
+        let rag = getRagForSession(session.id, collectionName: session.collectionName)
+        await rag.loadCollection()
+        await rag.addEntry(entry)
+    }
+    
+    func getRagNeighbors(for session: ChatSession) -> [(String, Double)] {
+        let rag = getRagForSession(session.id, collectionName: session.collectionName)
+        return rag.neighbors
+    }
+    
+    func webSearch(_ UIQuery: String, for chatSession: ChatSession) async throws {
+        guard let sessionId = currentSessionId else { return }
+        
         userLLMResponse = ""
         userLLMQuery = UIQuery
         isWebSearching = true
         webSearchResults = []
+        
+        // Save user message
+        let userMessage = ChatMessage(text: UIQuery, isUser: true)
+        chatMessages.append(userMessage)
+        databaseManager.saveMessage(userMessage, sessionId: sessionId)
         
         // Perform web search and scraping
         let results = await webSearch.searchAndScrape(query: userLLMQuery)
@@ -70,17 +118,35 @@ class LLM: ObservableObject {
         
         // Generate response using LLM
         let responseStream = session.streamResponse(to: prompt)
+        var fullResponse = ""
         for try await partialStream in responseStream {
             userLLMResponse = partialStream
+            fullResponse = partialStream.description
         }
+        
+        // Save assistant message
+        let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
+        chatMessages.append(assistantMessage)
+        databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        
         isWebSearching = false
     }
     
-    func queryLLM(_ UIQuery: String) async throws {
+    func queryLLM(_ UIQuery: String, for chatSession: ChatSession) async throws {
+        guard let sessionId = currentSessionId else { return }
+        
         userLLMResponse = ""
         userLLMQuery = UIQuery
-        await rag.findLLMNeighbors(for: userLLMQuery)
         webSearchResults = [] // Clear web search results when using RAG
+        
+        // Save user message
+        let userMessage = ChatMessage(text: UIQuery, isUser: true)
+        chatMessages.append(userMessage)
+        databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        
+        let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
+        await rag.loadCollection()
+        await rag.findLLMNeighbors(for: userLLMQuery)
         
         let prompt = """
                     You are a helpful assistant that answers questions based on the provided context.
@@ -98,9 +164,16 @@ class LLM: ObservableObject {
                     Answer:
                     """
         let responseStream = session.streamResponse(to: prompt)
+        var fullResponse = ""
         for try await partialStream in responseStream {
             userLLMResponse = partialStream
+            fullResponse = partialStream.description
         }
+        
+        // Save assistant message
+        let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
+        chatMessages.append(assistantMessage)
+        databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
     }
     
     

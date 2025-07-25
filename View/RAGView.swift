@@ -5,91 +5,83 @@
 //  Created by Sanskar Thapa on July 15th, 2025.
 //
 
-import Accelerate
-import CoreML
-import NaturalLanguage
-import SVDB
 import SwiftUI
-import FoundationModels
-import SwiftSoup
 import Foundation
-
-struct ChatMessage: Identifiable {
-    let id = UUID()
-    let text: String
-    let isUser: Bool
-    let sources: [WebSearchResult]?
-    let timestamp: Date
-    
-    init(text: String, isUser: Bool, sources: [WebSearchResult]? = nil) {
-        self.text = text
-        self.isUser = isUser
-        self.sources = sources
-        self.timestamp = Date()
-    }
-}
+import Combine
 
 struct RAGView: View {
     @StateObject private var llm = LLM()
+    @StateObject private var sessionManager = ChatSessionManager()
     
     @State private var messageText: String = ""
-    @State private var chatMessages: [ChatMessage] = []
     @State private var useRAG: Bool = true
     @State private var useWebSearch: Bool = false
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
+    @State private var showSidebar: Bool = true
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            headerView
-            
-            // Chat messages
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(chatMessages) { message in
-                            ChatBubbleView(message: message)
-                                .id(message.id)
-                        }
-                        
-                        
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                }
-                .onChange(of: chatMessages.count) { _ in
-                    if let lastMessage = chatMessages.last {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
-                }
-                .onChange(of: llm.userLLMResponse) { response in
-                    if let response = response, !response.description.isEmpty {
-                        updateLastAssistantMessage(with: response.description)
-                    }
-                }
+        HStack(spacing: 0) {
+            // Sidebar
+            if showSidebar {
+                ChatSidebar(sessionManager: sessionManager)
+                    .frame(width: 280)
             }
             
-            // Input area
-            inputView
+            // Main chat area
+            VStack(spacing: 0) {
+                // Header
+                headerView
+                
+                // Chat content
+                if let currentSession = sessionManager.currentSession {
+                    chatContentView(for: currentSession)
+                } else {
+                    emptyStateView
+                }
+                
+                // Input area
+                if sessionManager.currentSession != nil {
+                    inputView
+                }
+            }
         }
         .background(Color(.systemBackground))
         .onAppear {
-            Task {
-                await llm.rag.loadCollection()
+            // Initialize with first session or create one if none exist
+            if sessionManager.sessions.isEmpty {
+                _ = sessionManager.createNewSession()
+            }
+            
+            if let currentSession = sessionManager.currentSession {
+                llm.switchToSession(currentSession)
+            }
+        }
+        .onChange(of: sessionManager.currentSession) { oldValue, newValue in
+            if let session = newValue {
+                llm.switchToSession(session)
             }
         }
         .sheet(isPresented: $showKnowledgeBase) {
-            KnowledgeBaseView(llm: llm, newEntry: $newEntry)
+            if let currentSession = sessionManager.currentSession {
+                KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry)
+            }
         }
     }
     
     private var headerView: some View {
         VStack(spacing: 12) {
             HStack {
-                Text("RAG Chat Assistant")
+                // Sidebar toggle
+                Button(action: { 
+                    showSidebar.toggle()
+                }) {
+                    Image(systemName: "sidebar.leading")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                }
+                
+                Text(sessionManager.currentSession?.displayTitle ?? "RAG Chat Assistant")
                     .font(.title2)
                     .fontWeight(.semibold)
                 
@@ -104,23 +96,19 @@ struct RAGView: View {
             
             // Mode toggles
             HStack(spacing: 20) {
-                Toggle("RAG Mode", isOn: Binding(
-                    get: { useRAG },
-                    set: { newValue in
-                        useRAG = newValue
+                Toggle("RAG Mode", isOn: $useRAG)
+                    .toggleStyle(.switch)
+                    .tint(.green)
+                    .onChange(of: useRAG) { oldValue, newValue in
                         if newValue { useWebSearch = false }
                     }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .green))
                 
-                Toggle("Web Search", isOn: Binding(
-                    get: { useWebSearch },
-                    set: { newValue in
-                        useWebSearch = newValue
+                Toggle("Web Search", isOn: $useWebSearch)
+                    .toggleStyle(.switch)
+                    .tint(.blue)
+                    .onChange(of: useWebSearch) { oldValue, newValue in
                         if newValue { useRAG = false }
                     }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
             }
             .font(.subheadline)
             
@@ -129,6 +117,52 @@ struct RAGView: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .background(Color(.systemBackground))
+    }
+    
+    private func chatContentView(for session: ChatSession) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(llm.chatMessages) { message in
+                        ChatBubbleView(message: message)
+                            .id(message.id)
+                    }
+                    
+                    // Loading indicator
+                    if llm.isWebSearching || llm.userLLMResponse != nil {
+                        TypingIndicatorView()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .onChange(of: llm.chatMessages.count) { oldValue, newValue in
+                if let lastMessage = llm.chatMessages.last {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "message")
+                .font(.system(size: 64))
+                .foregroundColor(.gray)
+            
+            Text("No chat selected")
+                .font(.title2)
+                .fontWeight(.medium)
+                .foregroundColor(.gray)
+            
+            Text("Select a chat from the sidebar or create a new one")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var inputView: some View {
@@ -165,42 +199,23 @@ struct RAGView: View {
     
     private func sendMessage() {
         let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedMessage.isEmpty else { return }
-        
-        // Add user message
-        let userMessage = ChatMessage(text: trimmedMessage, isUser: true)
-        chatMessages.append(userMessage)
+        guard !trimmedMessage.isEmpty, let currentSession = sessionManager.currentSession else { return }
         
         // Clear input
         messageText = ""
-        
-        // Add placeholder assistant message
-        let assistantMessage = ChatMessage(text: "", isUser: false)
-        chatMessages.append(assistantMessage)
         
         // Send to appropriate service
         Task {
             do {
                 if useWebSearch {
-                    try await llm.webSearch(trimmedMessage)
+                    try await llm.webSearch(trimmedMessage, for: currentSession)
                 } else if useRAG {
-                    try await llm.queryLLM(trimmedMessage)
+                    try await llm.queryLLM(trimmedMessage, for: currentSession)
                 }
             } catch {
-                updateLastAssistantMessage(with: "Sorry, there was an error processing your request.")
+                print("Error processing message: \(error)")
             }
         }
-    }
-    
-    private func updateLastAssistantMessage(with text: String) {
-        guard let lastIndex = chatMessages.lastIndex(where: { !$0.isUser }) else { return }
-        
-        let sources = useWebSearch ? llm.webSearchResults : nil
-        chatMessages[lastIndex] = ChatMessage(
-            text: text,
-            isUser: false,
-            sources: sources
-        )
     }
 }
 
@@ -254,9 +269,43 @@ struct ChatBubbleView: View {
     }
 }
 
+struct TypingIndicatorView: View {
+    @State private var animating = false
+    
+    var body: some View {
+        HStack {
+            HStack(spacing: 4) {
+                ForEach(0..<3) { index in
+                    Circle()
+                        .fill(Color.gray)
+                        .frame(width: 6, height: 6)
+                        .scaleEffect(animating ? 1.0 : 0.5)
+                        .animation(
+                            .easeInOut(duration: 0.6)
+                                .repeatForever()
+                                .delay(Double(index) * 0.2),
+                            value: animating
+                        )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemGray5))
+            )
+            
+            Spacer(minLength: 50)
+        }
+        .onAppear {
+            animating = true
+        }
+    }
+}
 
 struct KnowledgeBaseView: View {
     let llm: LLM
+    let session: ChatSession
     @Binding var newEntry: String
     @Environment(\.dismiss) private var dismiss
     
@@ -264,7 +313,7 @@ struct KnowledgeBaseView: View {
         NavigationView {
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Add Knowledge")
+                    Text("Add Knowledge to \(session.displayTitle)")
                         .font(.headline)
                     
                     TextField("Enter new knowledge entry...", text: $newEntry, axis: .vertical)
@@ -273,7 +322,7 @@ struct KnowledgeBaseView: View {
                     
                     Button("Add Entry") {
                         Task {
-                            await llm.rag.addEntry(newEntry)
+                            await llm.addEntry(newEntry, to: session)
                             newEntry = ""
                         }
                     }
@@ -284,12 +333,12 @@ struct KnowledgeBaseView: View {
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
                 
-                if !llm.rag.neighbors.isEmpty {
+                if !llm.getRagNeighbors(for: session).isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Knowledge Base Entries")
                             .font(.headline)
                         
-                        List(llm.rag.neighbors, id: \.0) { neighbor in
+                        List(llm.getRagNeighbors(for: session), id: \.0) { neighbor in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(neighbor.0)
                                     .font(.body)

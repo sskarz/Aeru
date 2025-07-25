@@ -2,7 +2,7 @@
 import Foundation
 import SwiftSoup
 
-struct WebSearchResult {
+struct WebSearchResult: Codable {
     let title: String
     let url: String
     let content: String
