@@ -11,6 +11,7 @@ struct WebSearchResult {
 class WebSearchService {
     private let session = URLSession.shared
     
+    // Searches and scrapes websites, returns webResults to add to LLM context
     func searchAndScrape(query: String) async -> [WebSearchResult] {
         do {
             // Get search results from DuckDuckGo search engine
