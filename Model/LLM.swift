@@ -28,7 +28,7 @@ class LLM: ObservableObject {
     // Web Search Services
     var webSearch: WebSearchService = WebSearchService()
     @Published var isWebSearching = false
-    @Published var webSearchResults = []
+    @Published var webSearchResults: [WebSearchResult] = []
     
     private var session: LanguageModelSession = LanguageModelSession()
     
@@ -67,7 +67,6 @@ class LLM: ObservableObject {
                     
                     Answer:
                     """
-        print("WEB SEARCH PROMPT: \n", prompt)
         
         // Generate response using LLM
         let responseStream = session.streamResponse(to: prompt)

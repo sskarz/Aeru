@@ -21,9 +21,6 @@ struct RAGView: View {
     
     @State private var newEntry: String = ""
     @State private var userLLMQuery: String = ""
-    @State private var userLLMResponse: String.PartiallyGenerated = ""
-    @State private var isWebSearching: Bool = false
-    @State private var webSearchResults: [WebSearchResult] = []
 
     var body: some View {
         VStack {
@@ -48,24 +45,18 @@ struct RAGView: View {
                 Button("RAG LLM") {
                     Task {
                         try await llm.queryLLM(userLLMQuery)
-                        if let userLLMResponse = llm.userLLMResponse {
-                            self.userLLMResponse = userLLMResponse
-                        }
                     }
                 }.padding()
                 
                 Button("Web Search") {
                     Task {
                         try await llm.webSearch(userLLMQuery)
-                        if let userLLMResponse = llm.userLLMResponse {
-                            self.userLLMResponse = userLLMResponse
-                        }
                     }
                 }
                 .padding()
-                .disabled(isWebSearching)
+                .disabled(llm.isWebSearching)
                 .overlay(
-                    isWebSearching ?
+                    llm.isWebSearching ?
                     HStack {
                         ProgressView()
                             .scaleEffect(0.8)
@@ -76,14 +67,14 @@ struct RAGView: View {
             }
             
             // Web search results indicato
-            if !webSearchResults.isEmpty {
+            if !llm.webSearchResults.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Web Sources Used:")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.blue)
                     
-                    ForEach(Array(webSearchResults.enumerated()), id: \.offset) { index, result in
+                    ForEach(Array(llm.webSearchResults.enumerated()), id: \.offset) { index, result in
                         Text("• \(result.title)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -96,7 +87,7 @@ struct RAGView: View {
                 .cornerRadius(8)
             }
             
-            TextEditor(text: $userLLMResponse)
+            TextEditor(text: .constant(llm.userLLMResponse?.description ?? ""))
                 .frame(minHeight: 100)
                 .padding(4)
                 .overlay(
@@ -105,6 +96,7 @@ struct RAGView: View {
                 )
                 .background(Color(.systemGray6))
                 .cornerRadius(8)
+                .disabled(true)
             
 
             List(rag.neighbors, id: \.0) { neighbor in
