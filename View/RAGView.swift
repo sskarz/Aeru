@@ -26,6 +26,9 @@ struct RAGView: View {
             if showSidebar {
                 ChatSidebar(sessionManager: sessionManager)
                     .frame(width: 280)
+                
+                // Divider between sidebar and main content
+                Divider()
             }
             
             // Main chat area
@@ -45,6 +48,7 @@ struct RAGView: View {
                     inputView
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(.systemBackground))
         .onAppear {
@@ -70,20 +74,26 @@ struct RAGView: View {
     }
     
     private var headerView: some View {
-        VStack(spacing: 12) {
-            HStack {
+        VStack(spacing: 16) {
+            HStack(spacing: 16) {
                 // Sidebar toggle
                 Button(action: { 
-                    showSidebar.toggle()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSidebar.toggle()
+                    }
                 }) {
-                    Image(systemName: "sidebar.leading")
+                    Image(systemName: showSidebar ? "sidebar.left" : "sidebar.leading")
                         .font(.title3)
                         .foregroundColor(.blue)
+                        .frame(width: 24, height: 24)
                 }
                 
-                Text(sessionManager.currentSession?.displayTitle ?? "RAG Chat Assistant")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(sessionManager.currentSession?.displayTitle ?? "RAG Chat Assistant")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                }
                 
                 Spacer()
                 
@@ -91,6 +101,7 @@ struct RAGView: View {
                     Image(systemName: "books.vertical")
                         .font(.title3)
                         .foregroundColor(.blue)
+                        .frame(width: 24, height: 24)
                 }
             }
             
@@ -114,15 +125,21 @@ struct RAGView: View {
             
             Divider()
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .background(Color(.systemBackground))
     }
     
     private func chatContentView(for session: ChatSession) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 16) {
+                    // Add some top padding if no messages
+                    if llm.chatMessages.isEmpty {
+                        Spacer()
+                            .frame(height: 50)
+                    }
+                    
                     ForEach(llm.chatMessages) { message in
                         ChatBubbleView(message: message)
                             .id(message.id)
@@ -131,15 +148,25 @@ struct RAGView: View {
                     // Loading indicator
                     if llm.isWebSearching || llm.userLLMResponse != nil {
                         TypingIndicatorView()
+                            .id("typing")
                     }
+                    
+                    // Bottom spacer for better scroll behavior
+                    Spacer()
+                        .frame(height: 20)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: llm.chatMessages.count) { oldValue, newValue in
                 if let lastMessage = llm.chatMessages.last {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                } else if llm.isWebSearching || llm.userLLMResponse != nil {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo("typing", anchor: .bottom)
                     }
                 }
             }
@@ -147,52 +174,59 @@ struct RAGView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "message")
-                .font(.system(size: 64))
-                .foregroundColor(.gray)
+        VStack(spacing: 20) {
+            Spacer()
             
-            Text("No chat selected")
-                .font(.title2)
-                .fontWeight(.medium)
-                .foregroundColor(.gray)
+            Image(systemName: "message.circle")
+                .font(.system(size: 80))
+                .foregroundColor(.gray.opacity(0.6))
             
-            Text("Select a chat from the sidebar or create a new one")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text("No chat selected")
+                    .font(.title2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                
+                Text("Select a chat from the sidebar or create a new one to get started")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+            
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var inputView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             Divider()
             
             HStack(spacing: 12) {
-                TextField("Message...", text: $messageText, axis: .vertical)
+                TextField("Type a message...", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .background(Color(.systemGray6))
-                    .cornerRadius(20)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
                     .lineLimit(1...4)
                 
                 Button(action: sendMessage) {
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 40, height: 40)
                         .background(
                             Circle()
                                 .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
-                                      Color.gray : Color.blue)
+                                      Color.gray.opacity(0.6) : Color.blue)
                         )
                 }
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
         .background(Color(.systemBackground))
     }

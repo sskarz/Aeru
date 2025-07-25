@@ -57,7 +57,7 @@ struct ChatSidebar: View {
             
             Spacer()
         }
-        .background(Color(.systemGray6))
+        .background(Color(.systemBackground))
         .alert("New Chat", isPresented: $showingNewChatAlert) {
             TextField("Chat title", text: $newChatTitle)
             Button("Create") {
