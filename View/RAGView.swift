@@ -3,6 +3,7 @@
 //  SVDBDemo
 //
 //  Created by Sanskar Thapa on July 15th, 2025.
+// Code reset
 //
 // Resetting
 import Accelerate
@@ -17,7 +18,6 @@ import Foundation
 // Main view
 struct RAGView: View {
     @StateObject private var llm = LLM()
-    @StateObject private var rag = RAGModel()
     
     @State private var newEntry: String = ""
     @State private var userLLMQuery: String = ""
@@ -29,7 +29,7 @@ struct RAGView: View {
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                 Button("Add Entry") {
                     Task {
-                        await rag.addEntry(newEntry)
+                        await llm.rag.addEntry(newEntry)
                     }
                 }
             }
@@ -99,7 +99,7 @@ struct RAGView: View {
                 .disabled(true)
             
 
-            List(rag.neighbors, id: \.0) { neighbor in
+            List(llm.rag.neighbors, id: \.0) { neighbor in
                 Text("\(neighbor.0) - \(neighbor.1)")
             }
             
@@ -107,7 +107,7 @@ struct RAGView: View {
         .padding()
         .onAppear {
             Task {
-                await rag.loadCollection()
+                await llm.rag.loadCollection()
             }
         }
     }

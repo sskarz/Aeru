@@ -6,19 +6,23 @@ import SVDB
 import Combine
 import FoundationModels
 
-class RAGModel: ObservableObject {
+class RAGModel {
     
     let collectionName: String
     var collection: Collection?
     var neighbors: [(String, Double)] = []
     
-    init(collectionName: String = "testCollection") {
+    init(collectionName: String) {
         self.collectionName = collectionName
     }
     
     func loadCollection() async {
+        if let existing = SVDB.shared.getCollection(collectionName) {
+            self.collection = existing
+            return
+        }
         do {
-            collection = try SVDB.shared.collection(collectionName)
+            self.collection = try SVDB.shared.collection(collectionName)
         } catch {
             print("Failed to load collection:", error)
         }
@@ -29,6 +33,9 @@ class RAGModel: ObservableObject {
         guard let embedding = generateEmbedding(for: entry) else {
             return
         }
+        print("COLLECTION: ", collection)
+        print("ENTRY STRING: ", entry)
+        print("EMBEDDING: ", embedding)
         collection.addDocument(text: entry, embedding: embedding)
     }
     
@@ -64,3 +71,4 @@ class RAGModel: ObservableObject {
     
     
 }
+

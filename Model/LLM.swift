@@ -19,7 +19,7 @@ class LLM: ObservableObject {
     // Contains all the generation and invokes RAGModel.swift and WebSearchService.swift
     
     // RAG
-    var rag: RAGModel = RAGModel()
+    var rag: RAGModel = RAGModel(collectionName: "dog")
     
     // LLM Generation
     @Published var userLLMQuery: String = ""
