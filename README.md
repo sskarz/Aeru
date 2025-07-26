@@ -4,9 +4,9 @@
 </div>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
-[![Swift](https://img.shields.io/badge/Swift-5.9-orange.svg)](https://swift.org/)
-[![Xcode](https://img.shields.io/badge/Xcode-15.0+-blue.svg)](https://developer.apple.com/xcode/)
+[![Platform](https://img.shields.io/badge/Platform-iOS-lightgrey.svg)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org/)
+[![Xcode](https://img.shields.io/badge/Xcode-16.0+-blue.svg)](https://developer.apple.com/xcode/)
 
 > **An intelligent macOS application that combines Retrieval-Augmented Generation (RAG) with web search to provide contextually aware AI responses.**
 
