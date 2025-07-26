@@ -12,23 +12,27 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 ## ✨ Features
 
 ### 🧠 **Dual Intelligence Sources**
+
 - **RAG System**: Search through local vector databases for relevant context
 - **Web Search**: Real-time web scraping via DuckDuckGo for up-to-date information
 - **Smart Routing**: Automatically determines the best information source for your query
 
 ### 🚀 **Advanced AI Capabilities**
+
 - **Apple FoundationModels**: Native integration with Apple's language models
 - **Vector Embeddings**: Semantic search using NaturalLanguage framework
 - **Streaming Responses**: Real-time response generation with live updates
 - **Context Awareness**: Maintains conversation history for coherent interactions
 
 ### 💻 **Native macOS Experience**
+
 - **SwiftUI Interface**: Modern, responsive design optimized for macOS
 - **Chat Sidebar**: Organized conversation management
 - **Keyboard Shortcuts**: Efficient navigation and interaction
 - **Document Processing**: Support for various file formats in the knowledge base
 
 ### 🔧 **Technical Excellence**
+
 - **Vector Database**: SVDB integration for efficient similarity search
 - **Web Scraping**: SwiftSoup for clean content extraction
 - **Rate Limiting**: Respectful web scraping with built-in delays
@@ -37,6 +41,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 ## 🛠 Installation
 
 ### Prerequisites
+
 - **macOS 14.0+** (Sonoma or later)
 - **Xcode 15.0+**
 - **Swift 5.9+**
@@ -44,18 +49,21 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 ### Setup Instructions
 
 1. **Clone the Repository**
+
    ```bash
    git clone https://github.com/yourusername/aeru.git
    cd aeru
    ```
 
 2. **Open in Xcode**
+
    ```bash
    open ../RAGSearchLLMSwift.xcodeproj
    ```
 
 3. **Install Dependencies**
    Dependencies are automatically managed through Xcode's built-in Swift Package Manager integration. The following packages will be resolved automatically:
+
    - **SVDB**: Vector database operations
    - **SwiftSoup**: HTML parsing and content extraction
    - **FoundationModels**: Apple's language model framework
@@ -69,19 +77,22 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 ## 🚦 Usage
 
 ### Basic Chat Interface
+
 1. **Start a Conversation**: Type your question in the input field
-2. **Choose Search Mode**: 
+2. **Choose Search Mode**:
    - Use RAG for queries about your local knowledge base
    - Use web search for current events and real-time information
 3. **View Responses**: Watch as responses stream in real-time
 4. **Manage Conversations**: Use the sidebar to organize multiple chat sessions
 
 ### RAG (Local Knowledge Base)
+
 - **Add Documents**: Process documents into the vector database
 - **Semantic Search**: Find relevant content using natural language queries
 - **Context Integration**: Retrieved content enhances AI responses
 
 ### Web Search
+
 - **Real-time Results**: Get current information from the web
 - **Smart Scraping**: Clean content extraction from top search results
 - **Source Attribution**: Responses include source information
@@ -104,6 +115,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 ```
 
 ### Data Flow
+
 1. **User Input** → RAGView captures user queries
 2. **Query Processing** → LLM class determines search strategy
 3. **Context Retrieval** → RAGModel searches vector database OR WebSearchService scrapes web
@@ -111,6 +123,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 5. **UI Updates** → Streaming responses update the interface in real-time
 
 ### Key Technologies
+
 - **SwiftUI**: Reactive UI framework
 - **Combine**: Reactive programming for data flow
 - **FoundationModels**: Apple's ML framework
@@ -122,6 +135,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 We welcome contributions! Here's how you can help:
 
 ### Development Setup
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes and test thoroughly
@@ -130,6 +144,7 @@ We welcome contributions! Here's how you can help:
 6. Open a Pull Request
 
 ### Code Standards
+
 - Follow Swift API Design Guidelines
 - Use SwiftUI best practices
 - Include unit tests for new functionality
@@ -137,6 +152,7 @@ We welcome contributions! Here's how you can help:
 - Ensure Xcode builds without warnings
 
 ### Areas for Contribution
+
 - 🐛 **Bug Fixes**: Help improve stability
 - ✨ **Features**: Add new capabilities
 - 📚 **Documentation**: Improve guides and examples
