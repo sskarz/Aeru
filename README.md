@@ -1,2 +1,2 @@
-# RAGSearchLLMSwift
+# Aeru-AI
 
