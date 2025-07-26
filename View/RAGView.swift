@@ -8,6 +8,7 @@
 import SwiftUI
 import Foundation
 import Combine
+import UniformTypeIdentifiers
 
 struct RAGView: View {
     @StateObject private var llm = LLM()
@@ -362,11 +363,16 @@ struct KnowledgeBaseView: View {
     @Binding var newEntry: String
     @Environment(\.dismiss) private var dismiss
     
+    @State private var showDocumentPicker = false
+    @State private var isProcessingDocument = false
+    @State private var documents: [(id: String, name: String, type: String, uploadedAt: Date)] = []
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
+                // Text Entry Section
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Add Knowledge to \(session.displayTitle)")
+                    Text("Add Text Knowledge to \(session.displayTitle)")
                         .font(.headline)
                     
                     TextField("Enter new knowledge entry...", text: $newEntry, axis: .vertical)
@@ -385,6 +391,58 @@ struct KnowledgeBaseView: View {
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
+                
+                // Document Upload Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Upload Documents")
+                        .font(.headline)
+                    
+                    Button(action: { showDocumentPicker = true }) {
+                        HStack {
+                            Image(systemName: "doc.badge.plus")
+                            Text("Upload PDF Document")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .disabled(isProcessingDocument)
+                    
+                    if isProcessingDocument {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Processing document...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                
+                // Uploaded Documents List
+                if !documents.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Uploaded Documents")
+                            .font(.headline)
+                        
+                        List(documents, id: \.id) { document in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(document.name)
+                                    .font(.body)
+                                    .lineLimit(1)
+                                Text("Uploaded: \(document.uploadedAt, style: .date)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .frame(maxHeight: 150)
+                    }
+                }
                 
                 if !llm.getRagNeighbors(for: session).isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
@@ -415,6 +473,43 @@ struct KnowledgeBaseView: View {
                     }
                 }
             }
+            .onAppear {
+                loadDocuments()
+            }
+            .fileImporter(
+                isPresented: $showDocumentPicker,
+                allowedContentTypes: [.pdf],
+                allowsMultipleSelection: false
+            ) { result in
+                handleDocumentSelection(result)
+            }
+        }
+    }
+    
+    private func loadDocuments() {
+        documents = llm.getDocuments(for: session)
+    }
+    
+    private func handleDocumentSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            
+            isProcessingDocument = true
+            
+            Task {
+                let success = await llm.processDocument(url: url, for: session)
+                
+                await MainActor.run {
+                    isProcessingDocument = false
+                    if success {
+                        loadDocuments()
+                    }
+                }
+            }
+            
+        case .failure(let error):
+            print("Document selection failed: \(error)")
         }
     }
 }

@@ -8,6 +8,8 @@ class DatabaseManager {
     // Tables
     private let chatSessions = Table("chat_sessions")
     private let chatMessages = Table("chat_messages")
+    private let documents = Table("documents")
+    private let documentChunks = Table("document_chunks")
     
     // Chat Sessions columns
     private let sessionId = Expression<String>("id")
@@ -23,6 +25,21 @@ class DatabaseManager {
     private let messageIsUser = Expression<Bool>("is_user")
     private let messageTimestamp = Expression<Date>("timestamp")
     private let messageSources = Expression<String?>("sources") // JSON string for web sources
+    
+    // Documents columns
+    private let documentId = Expression<String>("id")
+    private let documentSessionId = Expression<String>("session_id")
+    private let documentName = Expression<String>("name")
+    private let documentPath = Expression<String>("path")
+    private let documentType = Expression<String>("type")
+    private let documentUploadedAt = Expression<Date>("uploaded_at")
+    
+    // Document Chunks columns
+    private let chunkId = Expression<String>("id")
+    private let chunkDocumentId = Expression<String>("document_id")
+    private let chunkText = Expression<String>("text")
+    private let chunkIndex = Expression<Int>("chunk_index")
+    private let chunkEmbedded = Expression<Bool>("embedded")
     
     private init() {
         setupDatabase()
@@ -59,6 +76,27 @@ class DatabaseManager {
                 t.column(messageTimestamp)
                 t.column(messageSources)
                 t.foreignKey(messageSessionId, references: chatSessions, sessionId, delete: .cascade)
+            })
+            
+            // Create documents table
+            try db?.run(documents.create(ifNotExists: true) { t in
+                t.column(documentId, primaryKey: true)
+                t.column(documentSessionId)
+                t.column(documentName)
+                t.column(documentPath)
+                t.column(documentType)
+                t.column(documentUploadedAt)
+                t.foreignKey(documentSessionId, references: chatSessions, sessionId, delete: .cascade)
+            })
+            
+            // Create document chunks table
+            try db?.run(documentChunks.create(ifNotExists: true) { t in
+                t.column(chunkId, primaryKey: true)
+                t.column(chunkDocumentId)
+                t.column(chunkText)
+                t.column(chunkIndex)
+                t.column(chunkEmbedded, defaultValue: false)
+                t.foreignKey(chunkDocumentId, references: documents, documentId, delete: .cascade)
             })
         } catch {
             print("Create tables error: \(error)")
@@ -192,6 +230,91 @@ class DatabaseManager {
             try db?.run(sessionMessages.delete())
         } catch {
             print("Delete all messages error: \(error)")
+        }
+    }
+    
+    // MARK: - Documents
+    
+    func saveDocument(sessionId: String, name: String, path: String, type: String) -> String? {
+        let id = UUID().uuidString
+        
+        do {
+            let insert = documents.insert(
+                documentId <- id,
+                documentSessionId <- sessionId,
+                documentName <- name,
+                documentPath <- path,
+                documentType <- type,
+                documentUploadedAt <- Date()
+            )
+            try db?.run(insert)
+            return id
+        } catch {
+            print("Save document error: \(error)")
+            return nil
+        }
+    }
+    
+    func getDocuments(for sessionId: String) -> [(id: String, name: String, type: String, uploadedAt: Date)] {
+        do {
+            let docs = try db?.prepare(
+                documents
+                    .filter(documentSessionId == sessionId)
+                    .order(documentUploadedAt.desc)
+            )
+            
+            return docs?.map { row in
+                (id: row[documentId], name: row[documentName], type: row[documentType], uploadedAt: row[documentUploadedAt])
+            } ?? []
+        } catch {
+            print("Get documents error: \(error)")
+            return []
+        }
+    }
+    
+    func saveDocumentChunk(documentId: String, text: String, index: Int) -> String? {
+        let id = UUID().uuidString
+        
+        do {
+            let insert = documentChunks.insert(
+                chunkId <- id,
+                chunkDocumentId <- documentId,
+                chunkText <- text,
+                chunkIndex <- index,
+                chunkEmbedded <- false
+            )
+            try db?.run(insert)
+            return id
+        } catch {
+            print("Save document chunk error: \(error)")
+            return nil
+        }
+    }
+    
+    func getUnembeddedChunks(for sessionId: String) -> [(id: String, text: String)] {
+        do {
+            let chunks = try db?.prepare(
+                documentChunks
+                    .join(documents, on: chunkDocumentId == documentId)
+                    .filter(documentSessionId == sessionId && chunkEmbedded == false)
+                    .order(chunkIndex.asc)
+            )
+            
+            return chunks?.map { row in
+                (id: row[chunkId], text: row[chunkText])
+            } ?? []
+        } catch {
+            print("Get unembedded chunks error: \(error)")
+            return []
+        }
+    }
+    
+    func markChunkAsEmbedded(_ chunkId: String) {
+        do {
+            let chunk = documentChunks.filter(self.chunkId == chunkId)
+            try db?.run(chunk.update(chunkEmbedded <- true))
+        } catch {
+            print("Mark chunk as embedded error: \(error)")
         }
     }
 }
