@@ -18,37 +18,40 @@ struct RAGView: View {
     @State private var useWebSearch: Bool = false
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
-    @State private var showSidebar: Bool = true
+    @State private var showSidebar: Bool = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar
-            if showSidebar {
-                ChatSidebar(sessionManager: sessionManager)
-                    .frame(width: 280)
-                
-                // Divider between sidebar and main content
-                Divider()
-            }
-            
-            // Main chat area
-            VStack(spacing: 0) {
-                // Header
-                headerView
-                
-                // Chat content
-                if let currentSession = sessionManager.currentSession {
-                    chatContentView(for: currentSession)
-                } else {
-                    emptyStateView
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                // Sidebar
+                if showSidebar {
+                    ChatSidebar(sessionManager: sessionManager)
+                        .frame(width: min(300, geometry.size.width * 0.35))
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    
+                    // Divider between sidebar and main content
+                    Divider()
                 }
                 
-                // Input area
-                if sessionManager.currentSession != nil {
-                    inputView
+                // Main chat area.
+                VStack(spacing: 0) {
+                    // Header
+                    headerView
+                    
+                    // Chat content
+                    if let currentSession = sessionManager.currentSession {
+                        chatContentView(for: currentSession)
+                    } else {
+                        emptyStateView
+                    }
+                    
+                    // Input area
+                    if sessionManager.currentSession != nil {
+                        inputView
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(.systemBackground))
         .onAppear {
@@ -78,7 +81,7 @@ struct RAGView: View {
             HStack(spacing: 16) {
                 // Sidebar toggle
                 Button(action: { 
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
                         showSidebar.toggle()
                     }
                 }) {
@@ -187,7 +190,7 @@ struct RAGView: View {
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
                 
-                Text("Select a chat from the sidebar or create a new one to get started")
+                Text("Click the sidebar button to view your chats or create a new one to get started")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)

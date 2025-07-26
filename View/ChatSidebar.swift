@@ -23,17 +23,18 @@ struct ChatSidebar: View {
                         Image(systemName: "plus")
                             .font(.title3)
                             .foregroundColor(.blue)
+                            .frame(width: 24, height: 24)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.vertical, 16)
                 
                 Divider()
             }
             
             // Chat sessions list
             ScrollView {
-                LazyVStack(spacing: 4) {
+                LazyVStack(spacing: 6) {
                     ForEach(sessionManager.sessions) { session in
                         ChatSessionRow(
                             session: session,
@@ -51,11 +52,10 @@ struct ChatSidebar: View {
                         )
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
             }
-            
-            Spacer()
+            .frame(maxHeight: .infinity)
         }
         .background(Color(.systemBackground))
         .alert("New Chat", isPresented: $showingNewChatAlert) {
@@ -134,8 +134,8 @@ struct ChatSessionRow: View {
                     .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(isSelected ? Color.blue : Color.clear)
