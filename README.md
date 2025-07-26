@@ -1,4 +1,7 @@
-# 🔍 Aeru
+<div align="center">
+  <img src="appstore.png" alt="Logo" width="200">
+  <h1 align="center">Aeru: Enhanced Apple Intelligence</h1>
+</div>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
@@ -7,7 +10,7 @@
 
 > **An intelligent macOS application that combines Retrieval-Augmented Generation (RAG) with web search to provide contextually aware AI responses.**
 
-Aeru is a powerful macOS app that leverages Apple's FoundationModels framework to deliver intelligent responses by searching both local knowledge bases and real-time web content. Built with SwiftUI and optimized for macOS, it provides a seamless chat interface for enhanced AI interactions.
+Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to deliver intelligent responses by searching both local knowledge bases and real-time web content. Built with SwiftUI and optimized for iOS, it provides a seamless chat interface for enhanced AI interactions.
 
 ## ✨ Features
 
@@ -26,7 +29,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 
 ### 💻 **Native macOS Experience**
 
-- **SwiftUI Interface**: Modern, responsive design optimized for macOS
+- **SwiftUI Interface**: Modern, responsive design optimized for iOS
 - **Chat Sidebar**: Organized conversation management
 - **Keyboard Shortcuts**: Efficient navigation and interaction
 - **Document Processing**: Support for various file formats in the knowledge base
@@ -42,9 +45,9 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 
 ### Prerequisites
 
-- **macOS 14.0+** (Sonoma or later)
-- **Xcode 15.0+**
-- **Swift 5.9+**
+- **iOS 26.0 BETA REQUIRED+**
+- **Xcode 16.0+**
+- **Swift 6+**
 
 ### Setup Instructions
 
@@ -58,7 +61,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 2. **Open in Xcode**
 
    ```bash
-   open ../RAGSearchLLMSwift.xcodeproj
+   open ../Aeru.xcodeproj
    ```
 
 3. **Install Dependencies**
@@ -103,7 +106,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   RAGView.swift │    │    LLM.swift    │    │ RAGModel.swift  │
+│   AeruView.swift│    │    LLM.swift    │    │ RAGModel.swift  │
 │   (UI Layer)    │◄──►│ (Orchestrator)  │◄──►│ (Vector DB)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
@@ -116,7 +119,7 @@ Aeru is a powerful macOS app that leverages Apple's FoundationModels framework t
 
 ### Data Flow
 
-1. **User Input** → RAGView captures user queries
+1. **User Input** → AeruView captures user queries
 2. **Query Processing** → LLM class determines search strategy
 3. **Context Retrieval** → RAGModel searches vector database OR WebSearchService scrapes web
 4. **AI Generation** → FoundationModels generates contextual responses
@@ -173,5 +176,5 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ---
 
 <div align="center">
-  <strong>Built with ❤️ for the macOS community</strong>
+  <strong>Built with ❤️ for the iOS community</strong>
 </div>
