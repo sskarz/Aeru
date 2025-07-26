@@ -29,44 +29,79 @@ class RAGModel {
     }
     
     func addEntry(_ entry: String) async {
-        guard let collection = collection else { return }
+        guard let collection = collection else { 
+            print("ERROR: Collection is nil")
+            return 
+        }
         guard let embedding = generateEmbedding(for: entry) else {
+            print("ERROR: Failed to generate embedding for entry: \(String(entry.prefix(100)))...")
             return
         }
+        print("SUCCESS: Adding entry to collection")
         print("COLLECTION: ", collection)
-        print("ENTRY STRING: ", entry)
-        print("EMBEDDING: ", embedding)
+        print("ENTRY STRING: ", String(entry.prefix(200)))
+        print("EMBEDDING COUNT: ", embedding.count)
         collection.addDocument(text: entry, embedding: embedding)
+        print("SUCCESS: Document added to collection")
     }
     
     func generateEmbedding(for sentence: String) -> [Double]? {
         guard let embedding = NLEmbedding.wordEmbedding(for: .english) else {
+            print("ERROR: Failed to get NLEmbedding for English")
             return nil
         }
-        let words = sentence.lowercased().split(separator: " ")
-        guard let firstVector = embedding.vector(for: String(words.first!)) else {
+        
+        let words = sentence.lowercased().split(separator: " ").map { String($0) }
+        guard !words.isEmpty else {
+            print("ERROR: No words found in sentence")
             return nil
         }
-        var vectorSum = [Double](firstVector)
-        for word in words.dropFirst() {
-            if let vector = embedding.vector(for: String(word)) {
-                vDSP_vaddD(vectorSum, 1, vector, 1, &vectorSum, 1, vDSP_Length(vectorSum.count))
+        
+        var validVectors: [[Double]] = []
+        
+        for word in words {
+            if let vector = embedding.vector(for: word) {
+                validVectors.append([Double](vector))
             }
         }
+        
+        guard !validVectors.isEmpty else {
+            print("ERROR: No valid word embeddings found for any words in: \(String(sentence.prefix(50)))...")
+            return nil
+        }
+        
+        let vectorLength = validVectors[0].count
+        var vectorSum = [Double](repeating: 0, count: vectorLength)
+        
+        for vector in validVectors {
+            vDSP_vaddD(vectorSum, 1, vector, 1, &vectorSum, 1, vDSP_Length(vectorSum.count))
+        }
+        
         var vectorAverage = [Double](repeating: 0, count: vectorSum.count)
-        var divisor = Double(words.count)
+        var divisor = Double(validVectors.count)
         vDSP_vsdivD(vectorSum, 1, &divisor, &vectorAverage, 1, vDSP_Length(vectorAverage.count))
+        
+        print("SUCCESS: Generated embedding with \(validVectors.count) valid word vectors out of \(words.count) total words")
         return vectorAverage
     }
     
     func findLLMNeighbors(for query: String) async {
-        guard let collection = collection else { return }
+        guard let collection = collection else { 
+            print("ERROR: Collection is nil in findLLMNeighbors")
+            return 
+        }
         guard let queryEmbedding = generateEmbedding(for: query) else {
+            print("ERROR: Failed to generate query embedding")
             return
         }
-        let results = collection.search(query: queryEmbedding, num_results: 5)
+        
+        print("SUCCESS: Searching collection for query: \(query)")
+        let results = collection.search(query: queryEmbedding, num_results: 3)
         neighbors = results.map { ($0.text, $0.score) }
-        print("NEIGHBORS: ", neighbors)
+        print("SEARCH RESULTS: Found \(results.count) neighbors")
+        for (index, neighbor) in neighbors.enumerated() {
+            print("Neighbor \(index + 1): Score \(neighbor.1), Text: \(String(neighbor.0.prefix(100)))...")
+        }
     }
     
     

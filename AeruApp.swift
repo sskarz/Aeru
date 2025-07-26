@@ -8,10 +8,10 @@
 import SwiftUI
 
 @main
-struct RAGSearchLLMSwiftApp: App {
+struct AeruApp: App {
     var body: some Scene {
         WindowGroup {
-            RAGView()
+            AeruView()
         }
     }
 }
