@@ -4,11 +4,11 @@
 </div>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Platform](https://img.shields.io/badge/Platform-iOS-lightgrey.svg)](https://www.apple.com/macos/)
+[![Platform](https://img.shields.io/badge/Platform-iOS-lightgrey.svg)](https://www.apple.com/ios/)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org/)
 [![Xcode](https://img.shields.io/badge/Xcode-16.0+-blue.svg)](https://developer.apple.com/xcode/)
 
-> **An intelligent macOS application that combines Retrieval-Augmented Generation (RAG) with web search to provide contextually aware AI responses.**
+> **An intelligent iOS application that combines Retrieval-Augmented Generation (RAG) with web search to provide contextually aware AI responses.**
 
 Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to deliver intelligent responses by searching both local knowledge bases and real-time web content. Built with SwiftUI and optimized for iOS, it provides a seamless chat interface for enhanced AI interactions.
 
@@ -18,8 +18,7 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 - **RAG System**: Search through local vector databases for relevant context
 - **Web Search**: Real-time web scraping via DuckDuckGo for up-to-date information
-- **Smart Routing**: Automatically determines the best information source for your query
-
+  
 ### 🚀 **Advanced AI Capabilities**
 
 - **Apple FoundationModels**: Native integration with Apple's language models
@@ -45,7 +44,7 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ### Prerequisites
 
-- **iOS 26.0 BETA REQUIRED+**
+- **iOS 26.0 DEV/PUBLIC BETA REQUIRED+**
 - **Xcode 16.0+**
 - **Swift 6+**
 
@@ -106,7 +105,7 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   AeruView.swift│    │    LLM.swift    │    │ RAGModel.swift  │
+│  AeruView.swift │    │    LLM.swift    │    │  RAGModel.swift │
 │   (UI Layer)    │◄──►│ (Orchestrator)  │◄──►│ (Vector DB)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
