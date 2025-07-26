@@ -10,7 +10,7 @@ import Foundation
 import Combine
 import UniformTypeIdentifiers
 
-struct RAGView: View {
+struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
     
@@ -514,8 +514,8 @@ struct KnowledgeBaseView: View {
     }
 }
 
-struct RAGView_Previews: PreviewProvider {
+struct Aeru_Previews: PreviewProvider {
     static var previews: some View {
-        RAGView()
+        AeruView()
     }
 }
