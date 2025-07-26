@@ -148,8 +148,14 @@ struct RAGView: View {
                             .id(message.id)
                     }
                     
+                    // Streaming response display
+                    if let streamingResponse = llm.userLLMResponse {
+                        ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false))
+                            .id("streaming")
+                    }
+                    
                     // Loading indicator
-                    if llm.isWebSearching || llm.userLLMResponse != nil {
+                    if llm.isWebSearching && llm.userLLMResponse == nil {
                         TypingIndicatorView()
                             .id("typing")
                     }
@@ -167,7 +173,17 @@ struct RAGView: View {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
-                } else if llm.isWebSearching || llm.userLLMResponse != nil {
+                }
+            }
+            .onChange(of: llm.userLLMResponse) { oldValue, newValue in
+                if newValue != nil {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo("streaming", anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: llm.isWebSearching) { oldValue, newValue in
+                if newValue && llm.userLLMResponse == nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo("typing", anchor: .bottom)
                     }

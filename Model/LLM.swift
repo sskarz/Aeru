@@ -129,6 +129,8 @@ class LLM: ObservableObject {
         chatMessages.append(assistantMessage)
         databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         
+        // Clear streaming response to prevent duplicate display
+        userLLMResponse = nil
         isWebSearching = false
     }
     
@@ -174,6 +176,9 @@ class LLM: ObservableObject {
         let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
         chatMessages.append(assistantMessage)
         databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        
+        // Clear streaming response to prevent duplicate display
+        userLLMResponse = nil
     }
     
     
