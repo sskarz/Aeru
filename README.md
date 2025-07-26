@@ -8,9 +8,12 @@
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org/)
 [![Xcode](https://img.shields.io/badge/Xcode-16.0+-blue.svg)](https://developer.apple.com/xcode/)
 
-> **An intelligent iOS application that combines Retrieval-Augmented Generation (RAG) with web search to provide contextually aware AI responses.**
+> **An intelligent iOS application that combines Retrieval-Augmented Generation (RAG) and Web Search functions to provide contextually aware AI responses.**
 
 Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to deliver intelligent responses by searching both local knowledge bases and real-time web content. Built with SwiftUI and optimized for iOS, it provides a seamless chat interface for enhanced AI interactions.
+
+### 👨🏽‍💻 Demo Video
+https://youtube.com/shorts/YbZQ9n3_Bf8?si=Y0y2BjoxJZ1padLu
 
 ## ✨ Features
 
@@ -26,7 +29,7 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 - **Streaming Responses**: Real-time response generation with live updates
 - **Context Awareness**: Maintains conversation history for coherent interactions
 
-### 💻 **Native macOS Experience**
+### 💻 **Native iOS Experience**
 
 - **SwiftUI Interface**: Modern, responsive design optimized for iOS
 - **Chat Sidebar**: Organized conversation management
@@ -160,6 +163,11 @@ We welcome contributions! Here's how you can help:
 - 📚 **Documentation**: Improve guides and examples
 - 🧪 **Testing**: Expand test coverage
 - 🎨 **UI/UX**: Enhance user experience
+
+### Wishlist Updates
+
+- 🤖 **MCP Server Support**: Create curated list of MCP Servers to connect and use on-device
+- 🎤 **Voice Mode**: Enable voice mode to interact with the AI hands free
 
 ## 📄 License
 
