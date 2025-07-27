@@ -46,7 +46,7 @@ https://youtube.com/shorts/YbZQ9n3_Bf8?si=Y0y2BjoxJZ1padLu
 ## 🛠 Installation
 
 ### Prerequisites
-
+- **iPhone 15 Pro or higher end model REQUIRED**
 - **iOS 26.0 DEV/PUBLIC BETA REQUIRED+**
 - **Xcode 16.0+**
 - **Swift 6+**
