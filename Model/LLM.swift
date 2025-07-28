@@ -189,17 +189,31 @@ class LLM: ObservableObject {
                     """
         
         // Generate response using LLM
-        let responseStream = session.streamResponse(to: prompt)
-        var fullResponse = ""
-        for try await partialStream in responseStream {
-            userLLMResponse = partialStream
-            fullResponse = partialStream.description
+        do {
+            let responseStream = session.streamResponse(to: prompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                userLLMResponse = partialStream
+                fullResponse = partialStream.description
+            }
+            
+            // Save assistant message
+            let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            
+        } catch {
+            // Handle errors including guardrail violations
+            let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
+            } else {
+                "An error occurred while processing your request: \(error.localizedDescription)"
+            }
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false, sources: results)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
-        
-        // Save assistant message
-        let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
-        chatMessages.append(assistantMessage)
-        databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         
         // Clear streaming response to prevent duplicate display
         userLLMResponse = nil
@@ -239,17 +253,88 @@ class LLM: ObservableObject {
                     
                     Answer:
                     """
-        let responseStream = session.streamResponse(to: prompt)
-        var fullResponse = ""
-        for try await partialStream in responseStream {
-            userLLMResponse = partialStream
-            fullResponse = partialStream.description
+        do {
+            let responseStream = session.streamResponse(to: prompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                userLLMResponse = partialStream
+                fullResponse = partialStream.description
+            }
+            
+            // Save assistant message
+            let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            
+        } catch {
+            // Handle errors including guardrail violations
+            let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
+            } else {
+                "An error occurred while processing your request: \(error.localizedDescription)"
+            }
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
         
-        // Save assistant message
-        let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
-        chatMessages.append(assistantMessage)
-        databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        // Clear streaming response to prevent duplicate display
+        userLLMResponse = nil
+    }
+    
+    func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession) async throws {
+        guard let sessionId = currentSessionId else { return }
+        
+        userLLMResponse = ""
+        userLLMQuery = UIQuery
+        webSearchResults = [] // Clear web search results when using general mode
+        
+        // Save user message
+        let userMessage = ChatMessage(text: UIQuery, isUser: true)
+        chatMessages.append(userMessage)
+        databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        
+        // Create a simple prompt without RAG context or web search results
+        let prompt = """
+                    You are a helpful assistant. Answer the following question based on your general knowledge and training.
+                    
+                    Question: \(userLLMQuery)
+                    
+                    Instructions:
+                    1. Provide a helpful and accurate response based on your general knowledge
+                    2. Be concise and informative
+                    3. If you're not certain about something, mention that
+                    4. Use a conversational tone
+                    
+                    Answer:
+                    """
+        
+        do {
+            let responseStream = session.streamResponse(to: prompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                userLLMResponse = partialStream
+                fullResponse = partialStream.description
+            }
+            
+            // Save assistant message
+            let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            
+        } catch {
+            // Handle errors including guardrail violations
+            let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                "Sorry, I cannot provide a response to that query due to Apple's safety guidelines. Please try rephrasing your question."
+            } else {
+                "An error occurred while processing your request: \(error.localizedDescription)"
+            }
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        }
         
         // Clear streaming response to prevent duplicate display
         userLLMResponse = nil

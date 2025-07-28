@@ -270,6 +270,9 @@ struct AeruView: View {
                     try await llm.webSearch(trimmedMessage, for: currentSession)
                 } else if useRAG {
                     try await llm.queryLLM(trimmedMessage, for: currentSession)
+                } else {
+                    // When both RAG and Web Search are off, use general query
+                    try await llm.queryLLMGeneral(trimmedMessage, for: currentSession)
                 }
             } catch {
                 print("Error processing message: \(error)")
