@@ -20,6 +20,7 @@ struct AeruView: View {
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
     @State private var showSidebar: Bool = false
+    @FocusState private var isMessageFieldFocused: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -82,6 +83,7 @@ struct AeruView: View {
             HStack(spacing: 16) {
                 // Sidebar toggle
                 Button(action: { 
+                    isMessageFieldFocused = false
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showSidebar.toggle()
                     }
@@ -169,6 +171,8 @@ struct AeruView: View {
                 .padding(.vertical, 16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .scrollDismissesKeyboard(.immediately)
+            
             .onChange(of: llm.chatMessages.count) { oldValue, newValue in
                 if let lastMessage = llm.chatMessages.last {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -226,6 +230,7 @@ struct AeruView: View {
             HStack(spacing: 12) {
                 TextField("Type a message...", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
+                    .focused($isMessageFieldFocused)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(Color(.systemGray6))

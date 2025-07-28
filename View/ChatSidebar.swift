@@ -130,8 +130,10 @@ struct ChatSessionRow: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.caption)
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
             }
         }
         .padding(.horizontal, 14)
