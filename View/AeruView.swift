@@ -27,7 +27,7 @@ struct AeruView: View {
                 // Sidebar
                 if showSidebar {
                     ChatSidebar(sessionManager: sessionManager)
-                        .frame(width: min(300, geometry.size.width * 0.35))
+                        .frame(width: min(300, geometry.size.width * 0.50))
                         .transition(.move(edge: .leading).combined(with: .opacity))
                     
                     // Divider between sidebar and main content
