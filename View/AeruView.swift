@@ -314,6 +314,7 @@ struct ChatBubbleView: View {
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
                 Text(message.text)
+                    .textSelection(.enabled)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(
@@ -337,6 +338,7 @@ struct ChatBubbleView: View {
                                 .lineLimit(1)
                         }
                     }
+                    .textSelection(.enabled)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
