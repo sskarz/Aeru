@@ -56,6 +56,28 @@ struct AeruView: View {
             }
         }
         .background(Color(.systemBackground))
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    // Detect swipe right from left edge to show sidebar
+                    if value.startLocation.x < 50 && // Started near left edge
+                        value.translation.width > 100 &&   // Swiped right at least 100 points
+                       abs(value.translation.height) < 200 && // Mostly horizontal swipe
+                       !showSidebar {                 // Only if sidebar is currently hidden
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showSidebar = true
+                        }
+                    }
+                    // Detect swipe left to hide sidebar when it's shown
+                    else if value.translation.width < -100 && // Swiped left at least 100 points
+                            abs(value.translation.height) < 200 && // Mostly horizontal swipe
+                            showSidebar {                     // Only if sidebar is currently shown
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showSidebar = false
+                        }
+                    }
+                }
+        )
         .onAppear {
             // Initialize with first session or create one if none exist
             if sessionManager.sessions.isEmpty {
