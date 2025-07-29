@@ -9,6 +9,7 @@ import SwiftUI
 import Foundation
 import Combine
 import UniformTypeIdentifiers
+import WebKit
 
 struct AeruView: View {
     @StateObject private var llm = LLM()
@@ -20,6 +21,8 @@ struct AeruView: View {
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
     @State private var showSidebar: Bool = false
+    @State private var showWebBrowser: Bool = false
+    @State private var webBrowserURL: String = ""
     @FocusState private var isMessageFieldFocused: Bool
 
     var body: some View {
@@ -64,7 +67,7 @@ struct AeruView: View {
                         value.translation.width > 100 &&   // Swiped right at least 100 points
                        abs(value.translation.height) < 200 && // Mostly horizontal swipe
                        !showSidebar {                 // Only if sidebar is currently hidden
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(.easeInOut(duration: 0.05)) {
                             showSidebar = true
                         }
                     }
@@ -72,7 +75,7 @@ struct AeruView: View {
                     else if value.translation.width < -100 && // Swiped left at least 100 points
                             abs(value.translation.height) < 200 && // Mostly horizontal swipe
                             showSidebar {                     // Only if sidebar is currently shown
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(.easeInOut(duration: 0.05)) {
                             showSidebar = false
                         }
                     }
@@ -97,6 +100,9 @@ struct AeruView: View {
             if let currentSession = sessionManager.currentSession {
                 KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry)
             }
+        }
+        .sheet(isPresented: $showWebBrowser) {
+            WebBrowserView(url: webBrowserURL)
         }
     }
     
@@ -169,14 +175,20 @@ struct AeruView: View {
                     }
                     
                     ForEach(llm.chatMessages) { message in
-                        ChatBubbleView(message: message)
-                            .id(message.id)
+                        ChatBubbleView(message: message) { url in
+                            webBrowserURL = url
+                            showWebBrowser = true
+                        }
+                        .id(message.id)
                     }
                     
                     // Streaming response display
                     if let streamingResponse = llm.userLLMResponse {
-                        ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false))
-                            .id("streaming")
+                        ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false)) { url in
+                            webBrowserURL = url
+                            showWebBrowser = true
+                        }
+                        .id("streaming")
                     }
                     
                     // Loading indicator
@@ -305,6 +317,12 @@ struct AeruView: View {
 
 struct ChatBubbleView: View {
     let message: ChatMessage
+    let onLinkTap: ((String) -> Void)?
+    
+    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil) {
+        self.message = message
+        self.onLinkTap = onLinkTap
+    }
     
     var body: some View {
         HStack {
@@ -332,10 +350,22 @@ struct ChatBubbleView: View {
                             .foregroundColor(.secondary)  
                         
                         ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
-                            Text("• \(source.title)")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
-                                .lineLimit(1)
+                            Button(action: {
+                                onLinkTap?(source.url)
+                            }) {
+                                HStack(alignment: .top, spacing: 4) {
+                                    Text("•")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                    Text(source.title)
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                        .lineLimit(1)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .textSelection(.enabled)
@@ -542,6 +572,122 @@ struct KnowledgeBaseView: View {
             
         case .failure(let error):
             print("Document selection failed: \(error)")
+        }
+    }
+}
+
+struct WebBrowserView: View {
+    let url: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var isLoading = true
+    @State private var canGoBack = false
+    @State private var canGoForward = false
+    @State private var webView: WKWebView?
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                if isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemGray6))
+                }
+                
+                WebView(url: url, 
+                       isLoading: $isLoading,
+                       canGoBack: $canGoBack,
+                       canGoForward: $canGoForward,
+                       webView: $webView)
+            }
+            .navigationTitle("Web Browser")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
+                    Button(action: {
+                        webView?.goBack()
+                    }) {
+                        Image(systemName: "chevron.left")
+                    }
+                    .disabled(!canGoBack)
+                    
+                    Button(action: {
+                        webView?.goForward()
+                    }) {
+                        Image(systemName: "chevron.right")
+                    }
+                    .disabled(!canGoForward)
+                    
+                    Button(action: {
+                        webView?.reload()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct WebView: UIViewRepresentable {
+    let url: String
+    @Binding var isLoading: Bool
+    @Binding var canGoBack: Bool
+    @Binding var canGoForward: Bool
+    @Binding var webView: WKWebView?
+    
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
+        self.webView = webView
+        
+        if let url = URL(string: url) {
+            let request = URLRequest(url: url)
+            webView.load(request)
+        }
+        
+        return webView
+    }
+    
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        // No updates needed
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, WKNavigationDelegate {
+        let parent: WebView
+        
+        init(_ parent: WebView) {
+            self.parent = parent
+        }
+        
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            parent.isLoading = true
+        }
+        
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            parent.isLoading = false
+            parent.canGoBack = webView.canGoBack
+            parent.canGoForward = webView.canGoForward
+        }
+        
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            parent.isLoading = false
         }
     }
 }
