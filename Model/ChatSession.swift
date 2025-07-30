@@ -84,9 +84,7 @@ class ChatSessionManager: ObservableObject {
             sessions[index] = updatedSession
         }
         
-        // Move to top of list
-        sessions.removeAll { $0.id == session.id }
-        sessions.insert(updatedSession, at: 0)
+        // Keep the chat in its current position - removed repositioning logic
     }
 }
 
