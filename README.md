@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="appstore.png" alt="Logo" width="200">
+  <img src="Aeru/appstore.png" alt="Logo" width="200">
   <h1 align="center">Aeru: Enhanced Apple Intelligence</h1>
 </div>
 
@@ -12,8 +12,8 @@
 
 Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to deliver intelligent responses by searching both local knowledge bases and real-time web content. Built with SwiftUI and optimized for iOS, it provides a seamless chat interface for enhanced AI interactions.
 
-### 👨🏽‍💻 Demo Video
-https://youtube.com/shorts/YbZQ9n3_Bf8?si=Y0y2BjoxJZ1padLu
+### 👨🏽‍💻 [Demo Video](https://youtube.com/shorts/BJqX9k7rXzo?feature=share)
+
 
 ## ✨ Features
 
