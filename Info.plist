@@ -7,21 +7,5 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
-	<key>CFBundleDocumentTypes</key>
-	<array>
-		<dict/>
-	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict/>
-	</array>
-	<key>UTExportedTypeDeclarations</key>
-	<array>
-		<dict/>
-	</array>
-	<key>UTImportedTypeDeclarations</key>
-	<array>
-		<dict/>
-	</array>
 </dict>
 </plist>
