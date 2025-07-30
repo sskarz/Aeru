@@ -275,7 +275,6 @@ struct AeruView: View {
     
     private var inputView: some View {
         VStack(spacing: 0) {
-            Divider()
             
             HStack(spacing: 12) {
                 TextField("Type a message...", text: $messageText, axis: .vertical)
@@ -308,6 +307,7 @@ struct AeruView: View {
             .padding(.vertical, 16)
         }
         .background(Color(.systemBackground))
+        .glassEffect()
     }
     
     private func sendMessage() {
