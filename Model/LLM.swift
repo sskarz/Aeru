@@ -35,7 +35,7 @@ class LLM: ObservableObject {
     private var currentSessionId: String?
     private let databaseManager = DatabaseManager.shared
     
-    private var session: LanguageModelSession = LanguageModelSession()
+    private lazy var session: LanguageModelSession = LanguageModelSession()
     
     private func newSession(previousSession: LanguageModelSession) -> LanguageModelSession {
         let allEntries = previousSession.transcript

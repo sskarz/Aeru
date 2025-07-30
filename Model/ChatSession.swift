@@ -27,7 +27,12 @@ class ChatSessionManager: ObservableObject {
     private let databaseManager = DatabaseManager.shared
     
     init() {
-        loadSessions()
+        // Load sessions asynchronously to avoid blocking UI
+        Task {
+            await MainActor.run {
+                loadSessions()
+            }
+        }
     }
     
     func loadSessions() {

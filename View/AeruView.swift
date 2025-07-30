@@ -100,13 +100,16 @@ struct AeruView: View {
             }
         }
         .onAppear {
-            // Initialize with first session or create one if none exist
-            if sessionManager.sessions.isEmpty {
-                _ = sessionManager.createNewSession()
-            }
-            
-            if let currentSession = sessionManager.currentSession {
-                llm.switchToSession(currentSession)
+            // Defer heavy initialization to avoid blocking UI
+            Task {
+                // Initialize with first session or create one if none exist
+                if sessionManager.sessions.isEmpty {
+                    _ = sessionManager.createNewSession()
+                }
+                
+                if let currentSession = sessionManager.currentSession {
+                    llm.switchToSession(currentSession)
+                }
             }
         }
         .onChange(of: sessionManager.currentSession) { oldValue, newValue in
@@ -283,6 +286,8 @@ struct AeruView: View {
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 24))
                     .lineLimit(1...4)
+                    .textInputAutocapitalization(.sentences)
+                    .disableAutocorrection(false)
                     .glassEffect()
                 
                 Button(action: sendMessage) {
