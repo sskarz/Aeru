@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 
+
 struct ChatSidebar: View {
     @ObservedObject var sessionManager: ChatSessionManager
     @State private var showingNewChatAlert = false

@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 import WebKit
 import UIKit
 
+
 struct BrowserURL: Identifiable {
     let id = UUID()
     let url: String
@@ -22,7 +23,7 @@ struct AeruView: View {
     @StateObject private var sessionManager = ChatSessionManager()
     
     @State private var messageText: String = ""
-    @State private var useRAG: Bool = true
+    @State private var useRAG: Bool = false
     @State private var useWebSearch: Bool = false
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
@@ -131,7 +132,7 @@ struct AeruView: View {
                     isMessageFieldFocused = false
                     showSidebar.toggle()
                 }) {
-                    Image(systemName: showSidebar ? "sidebar.left" : "sidebar.leading")
+                    Image(systemName: "line.3.horizontal")
                         .font(.title3)
                         .foregroundColor(.blue)
                         .frame(width: 24, height: 24)
@@ -175,7 +176,6 @@ struct AeruView: View {
             Divider()
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 16)
         .background(Color(.systemBackground))
     }
     
@@ -286,7 +286,7 @@ struct AeruView: View {
                     .glassEffect()
                 
                 Button(action: sendMessage) {
-                    Image(systemName: "paperplane.fill")
+                    Image(systemName: "arrow.up")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
