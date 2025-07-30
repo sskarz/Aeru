@@ -102,7 +102,12 @@ struct AeruView: View {
         .onAppear {
             // Defer heavy initialization to avoid blocking UI
             Task {
-                // Initialize with first session or create one if none exist
+                // Wait for sessions to load from database first
+                await MainActor.run {
+                    sessionManager.loadSessions()
+                }
+                
+                // Only create a new session if none exist after loading
                 if sessionManager.sessions.isEmpty {
                     _ = sessionManager.createNewSession()
                 }
