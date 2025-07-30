@@ -272,10 +272,10 @@ struct AeruView: View {
                     .padding(.vertical, 12)
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .lineLimit(1...4)
+                    .lineLimit(1...2)
                     .textInputAutocapitalization(.sentences)
                     .disableAutocorrection(false)
-                    .glassEffect()
+                    .glassEffect(.regular)
                 
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up")
@@ -289,7 +289,7 @@ struct AeruView: View {
                         )
                 }
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .glassEffect()
+                .glassEffect(.regular)
             }
             
             // Mode selection icons
