@@ -176,28 +176,45 @@ class LLM: ObservableObject {
         let results = await webSearch.searchAndScrape(query: userLLMQuery)
         webSearchResults = results
         
-        // Create context from web search results
-        let webContext = results.map { result in
+        // Get or create RAG model for this session
+        let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
+        await rag.loadCollection()
+        
+        // Embed all scraped content into RAG
+        for result in results {
+            let chunks = webSearch.chunkText(result.content)
+            for chunk in chunks {
+                let chunkWithSource = """
+                Source: \(result.title) (\(result.url))
+                Content: \(chunk)
                 """
-                Title: \(result.title)
-                Content: \(result.content)
-                """
+                await rag.addEntry(chunkWithSource)
+            }
+        }
+        
+        // Use semantic similarity to find top 3 most relevant chunks
+        await rag.findLLMNeighbors(for: userLLMQuery)
+        
+        // Get top 3 neighbors for context
+        let topNeighbors = Array(rag.neighbors.prefix(3))
+        let semanticContext = topNeighbors.map { neighbor in
+            "Relevance Score: \(String(format: "%.3f", neighbor.1))\n\(neighbor.0)"
         }.joined(separator: "\n\n---\n\n")
         
-        // Create enhanced prompt with web context
+        // Create enhanced prompt with semantic search results
         let prompt = """
-                    You are a helpful assistant that answers questions based on web search results.
+                    You are a helpful assistant that answers questions based on semantically relevant web search results.
                     
-                    Web Search Results:
-                    \(webContext)
+                    Most Relevant Web Content (ranked by semantic similarity):
+                    \(semanticContext)
                     
                     Question: \(userLLMQuery)
                     
                     Instructions:
-                    1. Answer concisely based primarily on the web search results above
+                    1. Answer based primarily on the most relevant content above (higher relevance scores are more important)
                     2. Be accurate and cite the sources when possible
-                    3. If the web results don't contain enough information, say so
-                    4. Provide a comprehensive and informative response
+                    3. If the content doesn't fully answer the question, acknowledge the limitations
+                    4. Provide a comprehensive and informative response based on the available information
                     
                     Answer:
                     """

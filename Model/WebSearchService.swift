@@ -233,9 +233,8 @@ class WebSearchService {
             try doc.select("[class*=cookie]").remove()
             try doc.select("[class*=popup]").remove()
             
-            // Play around with maxLength
+            // Extract all content without length limits
             var allText = ""
-            let maxLength = 800
             
             // Extract text from paragraphs
             let paragraphs = try doc.select("p")
@@ -243,48 +242,34 @@ class WebSearchService {
                 let text = try paragraph.text()
                 if shouldIncludeText(text) {
                     allText += text + " "
-                    if allText.count >= maxLength { break }
                 }
             }
             
-            // Extract from articles if needed
-            if allText.count < 500 {
-                let articles = try doc.select("article")
-                for article in articles {
-                    let text = try article.text()
-                    if shouldIncludeText(text) {
-                        allText += text + " "
-                        if allText.count >= maxLength { break }
-                    }
+            // Extract from articles
+            let articles = try doc.select("article")
+            for article in articles {
+                let text = try article.text()
+                if shouldIncludeText(text) {
+                    allText += text + " "
                 }
             }
             
-            // Extract from content divs if needed
-            if allText.count < 500 {
-                let contentDivs = try doc.select("div[class*=content], div[class*=main], div[class*=body]")
-                for div in contentDivs {
-                    let text = try div.text()
-                    if shouldIncludeText(text) {
-                        allText += text + " "
-                        if allText.count >= maxLength { break }
-                    }
+            // Extract from content divs
+            let contentDivs = try doc.select("div[class*=content], div[class*=main], div[class*=body]")
+            for div in contentDivs {
+                let text = try div.text()
+                if shouldIncludeText(text) {
+                    allText += text + " "
                 }
             }
             
-            // Extract headers if still needed
-            if allText.count < 300 {
-                let headers = try doc.select("h1, h2, h3, h4, h5, h6")
-                for header in headers {
-                    let text = try header.text()
-                    if shouldIncludeText(text) && text.count > 5 {
-                        allText += text + " "
-                        if allText.count >= maxLength { break }
-                    }
+            // Extract headers
+            let headers = try doc.select("h1, h2, h3, h4, h5, h6")
+            for header in headers {
+                let text = try header.text()
+                if shouldIncludeText(text) && text.count > 5 {
+                    allText += text + " "
                 }
-            }
-            
-            if allText.count > maxLength {
-                allText = String(allText.prefix(maxLength)) + "..."
             }
             
             return (
@@ -313,5 +298,40 @@ class WebSearchService {
         }
         
         return true
+    }
+    
+    // Chunk large text content for embedding
+    func chunkText(_ text: String, maxLength: Int = 800) -> [String] {
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;"))
+        var chunks: [String] = []
+        var currentChunk = ""
+        
+        for sentence in sentences {
+            let trimmedSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedSentence.isEmpty { continue }
+            
+            let sentenceWithPeriod = trimmedSentence + "."
+            
+            // If adding this sentence would exceed maxLength, start a new chunk
+            if !currentChunk.isEmpty && (currentChunk.count + sentenceWithPeriod.count + 1) > maxLength {
+                if !currentChunk.isEmpty {
+                    chunks.append(currentChunk.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+                currentChunk = sentenceWithPeriod
+            } else {
+                if currentChunk.isEmpty {
+                    currentChunk = sentenceWithPeriod
+                } else {
+                    currentChunk += " " + sentenceWithPeriod
+                }
+            }
+        }
+        
+        // Add the last chunk if it's not empty
+        if !currentChunk.isEmpty {
+            chunks.append(currentChunk.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        
+        return chunks.filter { $0.count > 50 } // Filter out very short chunks
     }
 }
