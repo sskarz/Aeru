@@ -62,4 +62,5 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 claude.md
+.claude
 build
