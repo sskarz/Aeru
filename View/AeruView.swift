@@ -9,32 +9,40 @@ import SwiftUI
 import Foundation
 import Combine
 import UniformTypeIdentifiers
+import WebKit
+import UIKit
+
+
+struct BrowserURL: Identifiable {
+    let id = UUID()
+    let url: String
+}
 
 struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
     
     @State private var messageText: String = ""
-    @State private var useRAG: Bool = true
+    @State private var useRAG: Bool = false
     @State private var useWebSearch: Bool = false
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
     @State private var showSidebar: Bool = false
+    @State private var webBrowserURL: BrowserURL? = nil
+    @FocusState private var isMessageFieldFocused: Bool
+    
+    // Sidebar animation properties
+    @State private var offset: CGFloat = 0
+    @GestureState private var gestureOffset: CGFloat = 0
+    
+    private var sidebarWidth: CGFloat {
+        UIScreen.main.bounds.width * 0.8
+    }
 
     var body: some View {
         GeometryReader { geometry in
-            HStack(spacing: 0) {
-                // Sidebar
-                if showSidebar {
-                    ChatSidebar(sessionManager: sessionManager)
-                        .frame(width: min(300, geometry.size.width * 0.35))
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                    
-                    // Divider between sidebar and main content
-                    Divider()
-                }
-                
-                // Main chat area.
+            ZStack(alignment: .leading) {
+                // Main chat area (gets pushed by sidebar)
                 VStack(spacing: 0) {
                     // Header
                     headerView
@@ -52,17 +60,61 @@ struct AeruView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+                .offset(x: max(offset + gestureOffset, 0))
+                .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
+                .overlay(
+                    // Overlay for dimming when sidebar is open
+                    Color.black.opacity(getOverlayOpacity())
+                        .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: showSidebar)
+                        .onTapGesture {
+                            withAnimation {
+                                showSidebar = false
+                            }
+                        }
+                        .allowsHitTesting(showSidebar)
+                )
+                
+                // Sidebar
+                ChatSidebar(sessionManager: sessionManager)
+                    .frame(width: sidebarWidth)
+                    .offset(x: -sidebarWidth)
+                    .offset(x: max(offset + gestureOffset, 0))
+                    .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
+            }
+            .gesture(
+                DragGesture()
+                    .updating($gestureOffset) { value, out, _ in
+                        if value.translation.width > 0 && showSidebar {
+                            out = value.translation.width * 0.1
+                        } else {
+                            out = min(value.translation.width, sidebarWidth)
+                        }
+                    }
+                    .onEnded(onDragEnd)
+            )
+            .onChange(of: showSidebar) { _, newValue in
+                withAnimation {
+                    offset = newValue ? sidebarWidth : 0
+                }
             }
         }
-        .background(Color(.systemBackground))
         .onAppear {
-            // Initialize with first session or create one if none exist
-            if sessionManager.sessions.isEmpty {
-                _ = sessionManager.createNewSession()
-            }
-            
-            if let currentSession = sessionManager.currentSession {
-                llm.switchToSession(currentSession)
+            // Defer heavy initialization to avoid blocking UI
+            Task {
+                // Wait for sessions to load from database first
+                await MainActor.run {
+                    sessionManager.loadSessions()
+                }
+                
+                // Only create a new session if none exist after loading
+                if sessionManager.sessions.isEmpty {
+                    _ = sessionManager.createNewSession()
+                }
+                
+                if let currentSession = sessionManager.currentSession {
+                    llm.switchToSession(currentSession)
+                }
             }
         }
         .onChange(of: sessionManager.currentSession) { oldValue, newValue in
@@ -75,18 +127,20 @@ struct AeruView: View {
                 KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry)
             }
         }
+        .sheet(item: $webBrowserURL) { browserURL in
+            WebBrowserView(url: browserURL.url)
+        }
     }
     
     private var headerView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             HStack(spacing: 16) {
                 // Sidebar toggle
                 Button(action: { 
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showSidebar.toggle()
-                    }
+                    isMessageFieldFocused = false
+                    showSidebar.toggle()
                 }) {
-                    Image(systemName: showSidebar ? "sidebar.left" : "sidebar.leading")
+                    Image(systemName: "line.3.horizontal")
                         .font(.title3)
                         .foregroundColor(.blue)
                         .frame(width: 24, height: 24)
@@ -101,36 +155,12 @@ struct AeruView: View {
                 
                 Spacer()
                 
-                Button(action: { showKnowledgeBase.toggle() }) {
-                    Image(systemName: "books.vertical")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                        .frame(width: 24, height: 24)
-                }
             }
-            
-            // Mode toggles
-            HStack(spacing: 20) {
-                Toggle("RAG Mode", isOn: $useRAG)
-                    .toggleStyle(.switch)
-                    .tint(.green)
-                    .onChange(of: useRAG) { oldValue, newValue in
-                        if newValue { useWebSearch = false }
-                    }
-                
-                Toggle("Web Search", isOn: $useWebSearch)
-                    .toggleStyle(.switch)
-                    .tint(.blue)
-                    .onChange(of: useWebSearch) { oldValue, newValue in
-                        if newValue { useRAG = false }
-                    }
-            }
-            .font(.subheadline)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
             
             Divider()
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
         .background(Color(.systemBackground))
     }
     
@@ -145,14 +175,18 @@ struct AeruView: View {
                     }
                     
                     ForEach(llm.chatMessages) { message in
-                        ChatBubbleView(message: message)
-                            .id(message.id)
+                        ChatBubbleView(message: message) { url in
+                            webBrowserURL = BrowserURL(url: url)
+                        }
+                        .id(message.id)
                     }
                     
                     // Streaming response display
                     if let streamingResponse = llm.userLLMResponse {
-                        ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false))
-                            .id("streaming")
+                        ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false)) { url in
+                            webBrowserURL = BrowserURL(url: url)
+                        }
+                        .id("streaming")
                     }
                     
                     // Loading indicator
@@ -169,6 +203,8 @@ struct AeruView: View {
                 .padding(.vertical, 16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .scrollDismissesKeyboard(.immediately)
+            
             .onChange(of: llm.chatMessages.count) { oldValue, newValue in
                 if let lastMessage = llm.chatMessages.last {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -220,20 +256,36 @@ struct AeruView: View {
     }
     
     private var inputView: some View {
-        VStack(spacing: 0) {
-            Divider()
-            
+        VStack(spacing: 12) {
+            // Upload button, text input and send button
             HStack(spacing: 12) {
+                // Document upload button
+                Button(action: { showKnowledgeBase.toggle() }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.blue)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color(.systemGray6))
+                        )
+                }
+                .glassEffect(.regular)
+                
                 TextField("Type a message...", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
+                    .focused($isMessageFieldFocused)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .lineLimit(1...4)
+                    .lineLimit(1...2)
+                    .textInputAutocapitalization(.sentences)
+                    .disableAutocorrection(false)
+                    .glassEffect(.regular)
                 
                 Button(action: sendMessage) {
-                    Image(systemName: "paperplane.fill")
+                    Image(systemName: "arrow.up")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
@@ -244,10 +296,77 @@ struct AeruView: View {
                         )
                 }
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .glassEffect(.regular)
+            }
+            
+            // Mode selection icons
+            HStack(spacing: 24) {
+                // General Mode
+                Button(action: {
+                    useRAG = false
+                    useWebSearch = false
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 20))
+                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill((!useRAG && !useWebSearch) ? Color.blue.opacity(0.1) : Color.clear)
+                            )
+                        Text("General")
+                            .font(.caption2)
+                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
+                    }
+                }
+                
+                // RAG Mode
+                Button(action: {
+                    useRAG = true
+                    useWebSearch = false
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "books.vertical.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(useRAG ? .green : .gray)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(useRAG ? Color.green.opacity(0.1) : Color.clear)
+                            )
+                        Text("RAG")
+                            .font(.caption2)
+                            .foregroundColor(useRAG ? .green : .gray)
+                    }
+                }
+                
+                // Web Search Mode
+                Button(action: {
+                    useRAG = false
+                    useWebSearch = true
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "globe.americas.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(useWebSearch ? .blue : .gray)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(useWebSearch ? Color.blue.opacity(0.1) : Color.clear)
+                            )
+                        Text("Web")
+                            .font(.caption2)
+                            .foregroundColor(useWebSearch ? .blue : .gray)
+                    }
+                }
+                
+                Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 16)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .background(Color(.systemBackground))
     }
     
@@ -265,16 +384,44 @@ struct AeruView: View {
                     try await llm.webSearch(trimmedMessage, for: currentSession)
                 } else if useRAG {
                     try await llm.queryLLM(trimmedMessage, for: currentSession)
+                } else {
+                    // When both RAG and Web Search are off, use general query
+                    try await llm.queryLLMGeneral(trimmedMessage, for: currentSession)
                 }
             } catch {
                 print("Error processing message: \(error)")
             }
         }
     }
+    
+    private func onDragEnd(value: DragGesture.Value) {
+        let translation = value.translation.width
+        if translation > 0 && translation > (sidebarWidth * 0.6) {
+            showSidebar = true
+        } else if -translation > (sidebarWidth / 2) {
+            showSidebar = false
+        } else {
+            if offset == 0 || !showSidebar {
+                return
+            }
+            showSidebar = true
+        }
+    }
+    
+    private func getOverlayOpacity() -> CGFloat {
+        let progress = (offset + gestureOffset) / sidebarWidth
+        return min(progress * 0.4, 0.4) // Max opacity of 0.4
+    }
 }
 
 struct ChatBubbleView: View {
     let message: ChatMessage
+    let onLinkTap: ((String) -> Void)?
+    
+    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil) {
+        self.message = message
+        self.onLinkTap = onLinkTap
+    }
     
     var body: some View {
         HStack {
@@ -284,6 +431,7 @@ struct ChatBubbleView: View {
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
                 Text(message.text)
+                    .textSelection(.enabled)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(
@@ -301,12 +449,38 @@ struct ChatBubbleView: View {
                             .foregroundColor(.secondary)  
                         
                         ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
-                            Text("• \(source.title)")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
-                                .lineLimit(1)
+                            Button(action: {
+                                onLinkTap?(source.url)
+                            }) {
+                                HStack(alignment: .top, spacing: 4) {
+                                    Text("•")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                    Text(source.title)
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                        .lineLimit(1)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contextMenu {
+                                Button(action: {
+                                    copyToClipboard(source.url)
+                                }) {
+                                    Label("Copy Link", systemImage: "doc.on.clipboard")
+                                }
+                                
+                                Button(action: {
+                                    onLinkTap?(source.url)
+                                }) {
+                                    Label("Open Link", systemImage: "safari")
+                                }
+                            }
                         }
                     }
+                    .textSelection(.enabled)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
@@ -320,6 +494,10 @@ struct ChatBubbleView: View {
                 Spacer(minLength: 50)
             }
         }
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        UIPasteboard.general.string = text
     }
 }
 
@@ -370,27 +548,6 @@ struct KnowledgeBaseView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
-                // Text Entry Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Add Text Knowledge to \(session.displayTitle)")
-                        .font(.headline)
-                    
-                    TextField("Enter new knowledge entry...", text: $newEntry, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(3...6)
-                    
-                    Button("Add Entry") {
-                        Task {
-                            await llm.addEntry(newEntry, to: session)
-                            newEntry = ""
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(newEntry.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
                 
                 // Document Upload Section
                 VStack(alignment: .leading, spacing: 8) {
@@ -510,6 +667,154 @@ struct KnowledgeBaseView: View {
             
         case .failure(let error):
             print("Document selection failed: \(error)")
+        }
+    }
+}
+
+
+struct WebBrowserView: View {
+    let url: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var canGoBack = false
+    @State private var canGoForward = false
+    @State private var currentURL = ""
+    @State private var isLoading = false
+    @State private var webView: WKWebView?
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // URL Bar
+                HStack(spacing: 8) {
+                    Text(currentURL.isEmpty ? url : currentURL)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(.systemBackground))
+                .glassEffect()
+                
+                Divider()
+                
+                // WebView
+                WebView(
+                    url: url,
+                    canGoBack: $canGoBack,
+                    canGoForward: $canGoForward,
+                    currentURL: $currentURL,
+                    isLoading: $isLoading,
+                    webView: $webView
+                )
+                .id(url) // Force recreation when URL changes
+            }
+            .navigationTitle("Web Browser")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
+                    Button(action: {
+                        webView?.goBack()
+                    }) {
+                        Image(systemName: "chevron.left")
+                    }
+                    .disabled(!canGoBack)
+                    
+                    Button(action: {
+                        webView?.goForward()
+                    }) {
+                        Image(systemName: "chevron.right")
+                    }
+                    .disabled(!canGoForward)
+                    
+                    Button(action: {
+                        webView?.reload()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct WebView: UIViewRepresentable {
+    let url: String
+    @Binding var canGoBack: Bool
+    @Binding var canGoForward: Bool
+    @Binding var currentURL: String
+    @Binding var isLoading: Bool
+    @Binding var webView: WKWebView?
+    
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = context.coordinator
+        self.webView = webView
+        
+        if let validURL = URL(string: url) {
+            let request = URLRequest(url: validURL)
+            webView.load(request)
+        }
+        
+        return webView
+    }
+    
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        guard let currentURL = uiView.url?.absoluteString, currentURL != url else { return }
+        
+        if let validURL = URL(string: url) {
+            let request = URLRequest(url: validURL)
+            uiView.load(request)
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, WKNavigationDelegate {
+        let parent: WebView
+        
+        init(_ parent: WebView) {
+            self.parent = parent
+        }
+        
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            parent.isLoading = true
+        }
+        
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            parent.isLoading = false
+            parent.canGoBack = webView.canGoBack
+            parent.canGoForward = webView.canGoForward
+            parent.currentURL = webView.url?.absoluteString ?? ""
+        }
+        
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            parent.isLoading = false
+        }
+        
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            parent.isLoading = false
         }
     }
 }

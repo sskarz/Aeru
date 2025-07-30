@@ -1,12 +1,15 @@
 import SwiftUI
 import Foundation
 
+
 struct ChatSidebar: View {
     @ObservedObject var sessionManager: ChatSessionManager
     @State private var showingNewChatAlert = false
     @State private var newChatTitle = ""
     @State private var editingSession: ChatSession?
     @State private var editTitle = ""
+    @State private var showingDuplicateTitleAlert = false
+    @State private var showingEditDuplicateTitleAlert = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -62,11 +65,15 @@ struct ChatSidebar: View {
             TextField("Chat title", text: $newChatTitle)
             Button("Create") {
                 if !newChatTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    _ = sessionManager.createNewSession(title: newChatTitle)
+                    if sessionManager.createNewSession(title: newChatTitle) != nil {
+                        newChatTitle = ""
+                    } else {
+                        showingDuplicateTitleAlert = true
+                    }
                 } else {
                     _ = sessionManager.createNewSession()
+                    newChatTitle = ""
                 }
-                newChatTitle = ""
             }
             Button("Cancel", role: .cancel) {
                 newChatTitle = ""
@@ -81,10 +88,13 @@ struct ChatSidebar: View {
             TextField("Chat title", text: $editTitle)
             Button("Save") {
                 if let session = editingSession {
-                    sessionManager.updateSessionTitle(session, title: editTitle)
+                    if sessionManager.updateSessionTitle(session, title: editTitle) {
+                        editingSession = nil
+                        editTitle = ""
+                    } else {
+                        showingEditDuplicateTitleAlert = true
+                    }
                 }
-                editingSession = nil
-                editTitle = ""
             }
             Button("Cancel", role: .cancel) {
                 editingSession = nil
@@ -92,6 +102,20 @@ struct ChatSidebar: View {
             }
         } message: {
             Text("Edit the title for this chat session")
+        }
+        .alert("Duplicate Title", isPresented: $showingDuplicateTitleAlert) {
+            Button("OK") {
+                showingDuplicateTitleAlert = false
+            }
+        } message: {
+            Text("A chat with this title already exists. Please choose a different title.")
+        }
+        .alert("Duplicate Title", isPresented: $showingEditDuplicateTitleAlert) {
+            Button("OK") {
+                showingEditDuplicateTitleAlert = false
+            }
+        } message: {
+            Text("A chat with this title already exists. Please choose a different title.")
         }
     }
 }
@@ -130,8 +154,10 @@ struct ChatSessionRow: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.caption)
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
             }
         }
         .padding(.horizontal, 14)

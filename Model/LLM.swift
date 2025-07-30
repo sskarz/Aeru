@@ -35,7 +35,21 @@ class LLM: ObservableObject {
     private var currentSessionId: String?
     private let databaseManager = DatabaseManager.shared
     
-    private var session: LanguageModelSession = LanguageModelSession()
+    private lazy var session: LanguageModelSession = LanguageModelSession()
+    
+    private func newSession(previousSession: LanguageModelSession) -> LanguageModelSession {
+        let allEntries = previousSession.transcript
+        var condensedEntries = [Transcript.Entry]()
+        print("\nCONDENSED ENTRIES: ", condensedEntries)
+        if let firstEntry = allEntries.first {
+            condensedEntries.append(firstEntry)
+            if allEntries.count > 1, let lastEntry = allEntries.last {
+                condensedEntries.append(lastEntry)
+            }
+        }
+        let condensedTranscript = Transcript(entries: condensedEntries)
+        return LanguageModelSession(transcript: condensedTranscript)
+    }
     
     // Get or create RAG model for current session
     private func getRagForSession(_ sessionId: String, collectionName: String) -> RAGModel {
@@ -162,44 +176,105 @@ class LLM: ObservableObject {
         let results = await webSearch.searchAndScrape(query: userLLMQuery)
         webSearchResults = results
         
-        // Create context from web search results
-        let webContext = results.map { result in
-                """
-                Title: \(result.title)
-                Content: \(result.content)
-                """
+        // Get or create RAG model for this session
+        let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
+        await rag.loadCollection()
+        
+        // Embed all scraped content into RAG
+        for result in results {
+            let chunks = webSearch.chunkText(result.content)
+            for chunk in chunks {
+                await rag.addEntry(chunk)
+            }
+        }
+        
+        // Use semantic similarity to find top 3 most relevant chunks
+        await rag.findLLMNeighbors(for: userLLMQuery)
+        
+        // Get top 3 neighbors for context
+        let topNeighbors = Array(rag.neighbors.prefix(3))
+        let semanticContext = topNeighbors.map { neighbor in
+            "Relevance Score: \(String(format: "%.3f", neighbor.1))\n\(neighbor.0)"
         }.joined(separator: "\n\n---\n\n")
         
-        // Create enhanced prompt with web context
+        // Create enhanced prompt with semantic search results
         let prompt = """
-                    You are a helpful assistant that answers questions based on web search results.
+                    You are a helpful assistant that answers questions based on semantically relevant web search results.
                     
-                    Web Search Results:
-                    \(webContext)
+                    Most Relevant Web Content (ranked by semantic similarity):
+                    \(semanticContext)
                     
                     Question: \(userLLMQuery)
                     
                     Instructions:
-                    1. Answer concisely based primarily on the web search results above
+                    1. Answer based primarily on the most relevant content above (higher relevance scores are more important)
                     2. Be accurate and cite the sources when possible
-                    3. If the web results don't contain enough information, say so
-                    4. Provide a comprehensive and informative response
+                    3. If the content doesn't fully answer the question, acknowledge the limitations
+                    4. Provide a comprehensive and informative response based on the available information
                     
                     Answer:
                     """
         
         // Generate response using LLM
-        let responseStream = session.streamResponse(to: prompt)
-        var fullResponse = ""
-        for try await partialStream in responseStream {
-            userLLMResponse = partialStream
-            fullResponse = partialStream.description
+        do {
+            let responseStream = session.streamResponse(to: prompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                userLLMResponse = partialStream
+                fullResponse = partialStream.description
+            }
+            
+            // Save assistant message
+            let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            
+        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
+            // New session, with some history from the previous session
+            session = newSession(previousSession: session)
+            // Retry with new session
+            do {
+                let responseStream = session.streamResponse(to: prompt)
+                var fullResponse = ""
+                for try await partialStream in responseStream {
+                    userLLMResponse = partialStream
+                    fullResponse = partialStream.description
+                }
+                
+                // Save assistant message
+                let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
+                chatMessages.append(assistantMessage)
+                databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+            } catch {
+                let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                    "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
+                } else {
+                    "An error occurred while processing your request: \(error.localizedDescription)"
+                }
+                
+                let assistantMessage = ChatMessage(text: errorMessage, isUser: false, sources: results)
+                chatMessages.append(assistantMessage)
+                databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            }
+        } catch LanguageModelSession.GenerationError.rateLimited {
+            let errorMessage = "The on-device model is currently rate limited. Please wait a moment and try again."
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false, sources: results)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        } catch {
+            // Handle errors including guardrail violations
+            let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
+            } else {
+                "An error occurred while processing your request: \(error.localizedDescription)"
+            }
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false, sources: results)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
-        
-        // Save assistant message
-        let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
-        chatMessages.append(assistantMessage)
-        databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         
         // Clear streaming response to prevent duplicate display
         userLLMResponse = nil
@@ -239,17 +314,156 @@ class LLM: ObservableObject {
                     
                     Answer:
                     """
-        let responseStream = session.streamResponse(to: prompt)
-        var fullResponse = ""
-        for try await partialStream in responseStream {
-            userLLMResponse = partialStream
-            fullResponse = partialStream.description
+        do {
+            let responseStream = session.streamResponse(to: prompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                userLLMResponse = partialStream
+                fullResponse = partialStream.description
+            }
+            
+            // Save assistant message
+            let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            
+        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
+            // New session, with some history from the previous session
+            session = newSession(previousSession: session)
+            // Retry with new session
+            do {
+                let responseStream = session.streamResponse(to: prompt)
+                var fullResponse = ""
+                for try await partialStream in responseStream {
+                    userLLMResponse = partialStream
+                    fullResponse = partialStream.description
+                }
+                
+                // Save assistant message
+                let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
+                chatMessages.append(assistantMessage)
+                databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+            } catch {
+                let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                    "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
+                } else {
+                    "An error occurred while processing your request: \(error.localizedDescription)"
+                }
+                
+                let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+                chatMessages.append(assistantMessage)
+                databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            }
+        } catch LanguageModelSession.GenerationError.rateLimited {
+            let errorMessage = "The on-device model is currently rate limited. Please wait a moment and try again."
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        } catch {
+            // Handle errors including guardrail violations
+            let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
+            } else {
+                "An error occurred while processing your request: \(error.localizedDescription)"
+            }
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
         
-        // Save assistant message
-        let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
-        chatMessages.append(assistantMessage)
-        databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        // Clear streaming response to prevent duplicate display
+        userLLMResponse = nil
+    }
+    
+    func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession) async throws {
+        guard let sessionId = currentSessionId else { return }
+        
+        userLLMResponse = ""
+        userLLMQuery = UIQuery
+        webSearchResults = [] // Clear web search results when using general mode
+        
+        // Save user message
+        let userMessage = ChatMessage(text: UIQuery, isUser: true)
+        chatMessages.append(userMessage)
+        databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        
+        // Create a simple prompt without RAG context or web search results
+        let prompt = """
+                    You are a helpful assistant. Answer the following question based on your general knowledge and training.
+                    
+                    Question: \(userLLMQuery)
+                    
+                    Instructions:
+                    1. Provide a helpful and accurate response based on your general knowledge
+                    2. Be concise and informative
+                    3. If you're not certain about something, mention that
+                    4. Use a conversational tone
+                    
+                    Answer:
+                    """
+        
+        do {
+            let responseStream = session.streamResponse(to: prompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                userLLMResponse = partialStream
+                fullResponse = partialStream.description
+            }
+            
+            // Save assistant message
+            let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            
+        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
+            // New session, with some history from the previous session
+            session = newSession(previousSession: session)
+            // Retry with new session
+            do {
+                let responseStream = session.streamResponse(to: prompt)
+                var fullResponse = ""
+                for try await partialStream in responseStream {
+                    userLLMResponse = partialStream
+                    fullResponse = partialStream.description
+                }
+                
+                // Save assistant message
+                let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
+                chatMessages.append(assistantMessage)
+                databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+            } catch {
+                let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                    "Sorry, I cannot provide a response to that query due to Apple's safety guidelines. Please try rephrasing your question."
+                } else {
+                    "An error occurred while processing your request: \(error.localizedDescription)"
+                }
+                
+                let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+                chatMessages.append(assistantMessage)
+                databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+            }
+        } catch LanguageModelSession.GenerationError.rateLimited {
+            let errorMessage = "The on-device model is currently rate limited. Please wait a moment and try again."
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        } catch {
+            // Handle errors including guardrail violations
+            let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
+                "Sorry, I cannot provide a response to that query due to Apple's safety guidelines. Please try rephrasing your question."
+            } else {
+                "An error occurred while processing your request: \(error.localizedDescription)"
+            }
+            
+            let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
+            chatMessages.append(assistantMessage)
+            databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+        }
         
         // Clear streaming response to prevent duplicate display
         userLLMResponse = nil
