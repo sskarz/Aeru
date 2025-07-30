@@ -10,6 +10,7 @@ import Foundation
 import Combine
 import UniformTypeIdentifiers
 import WebKit
+import UIKit
 
 struct BrowserURL: Identifiable {
     let id = UUID()
@@ -71,7 +72,7 @@ struct AeruView: View {
                         value.translation.width > 100 &&   // Swiped right at least 100 points
                        abs(value.translation.height) < 200 && // Mostly horizontal swipe
                        !showSidebar {                 // Only if sidebar is currently hidden
-                        withAnimation(.easeInOut(duration: 0.05)) {
+                        withAnimation(.easeInOut(duration: 0.10)) {
                             showSidebar = true
                         }
                     }
@@ -79,7 +80,7 @@ struct AeruView: View {
                     else if value.translation.width < -100 && // Swiped left at least 100 points
                             abs(value.translation.height) < 200 && // Mostly horizontal swipe
                             showSidebar {                     // Only if sidebar is currently shown
-                        withAnimation(.easeInOut(duration: 0.05)) {
+                        withAnimation(.easeInOut(duration: 0.10)) {
                             showSidebar = false
                         }
                     }
@@ -368,6 +369,19 @@ struct ChatBubbleView: View {
                             }
                             .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .contextMenu {
+                                Button(action: {
+                                    copyToClipboard(source.url)
+                                }) {
+                                    Label("Copy Link", systemImage: "doc.on.clipboard")
+                                }
+                                
+                                Button(action: {
+                                    onLinkTap?(source.url)
+                                }) {
+                                    Label("Open Link", systemImage: "safari")
+                                }
+                            }
                         }
                     }
                     .textSelection(.enabled)
@@ -384,6 +398,10 @@ struct ChatBubbleView: View {
                 Spacer(minLength: 50)
             }
         }
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        UIPasteboard.general.string = text
     }
 }
 
