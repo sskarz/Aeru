@@ -481,27 +481,6 @@ struct KnowledgeBaseView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
-                // Text Entry Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Add Text Knowledge to \(session.displayTitle)")
-                        .font(.headline)
-                    
-                    TextField("Enter new knowledge entry...", text: $newEntry, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(3...6)
-                    
-                    Button("Add Entry") {
-                        Task {
-                            await llm.addEntry(newEntry, to: session)
-                            newEntry = ""
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(newEntry.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
                 
                 // Document Upload Section
                 VStack(alignment: .leading, spacing: 8) {
