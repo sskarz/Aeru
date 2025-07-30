@@ -133,7 +133,7 @@ struct AeruView: View {
     }
     
     private var headerView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             HStack(spacing: 16) {
                 // Sidebar toggle
                 Button(action: { 
@@ -154,13 +154,13 @@ struct AeruView: View {
                 }
                 
                 Spacer()
-    
+                
             }
-            
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
             
             Divider()
         }
-        .padding(.horizontal, 20)
         .background(Color(.systemBackground))
     }
     
@@ -262,7 +262,7 @@ struct AeruView: View {
                 // Document upload button
                 Button(action: { showKnowledgeBase.toggle() }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.blue)
                         .frame(width: 32, height: 32)
                         .background(
@@ -368,7 +368,6 @@ struct AeruView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(Color(.systemBackground))
-        .glassEffect()
     }
     
     private func sendMessage() {
