@@ -29,21 +29,19 @@ struct AeruView: View {
     @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
     @FocusState private var isMessageFieldFocused: Bool
+    
+    // Sidebar animation properties
+    @State private var offset: CGFloat = 0
+    @GestureState private var gestureOffset: CGFloat = 0
+    
+    private var sidebarWidth: CGFloat {
+        UIScreen.main.bounds.width * 0.8
+    }
 
     var body: some View {
         GeometryReader { geometry in
-            HStack(spacing: 0) {
-                // Sidebar
-                if showSidebar {
-                    ChatSidebar(sessionManager: sessionManager)
-                        .frame(width: min(300, geometry.size.width * 0.50))
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                    
-                    // Divider between sidebar and main content
-                    Divider()
-                }
-                
-                // Main chat area.
+            ZStack(alignment: .leading) {
+                // Main chat area (gets pushed by sidebar)
                 VStack(spacing: 0) {
                     // Header
                     headerView
@@ -61,31 +59,45 @@ struct AeruView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+                .offset(x: max(offset + gestureOffset, 0))
+                .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
+                .overlay(
+                    // Overlay for dimming when sidebar is open
+                    Color.black.opacity(getOverlayOpacity())
+                        .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: showSidebar)
+                        .onTapGesture {
+                            withAnimation {
+                                showSidebar = false
+                            }
+                        }
+                        .allowsHitTesting(showSidebar)
+                )
+                
+                // Sidebar
+                ChatSidebar(sessionManager: sessionManager)
+                    .frame(width: sidebarWidth)
+                    .offset(x: -sidebarWidth)
+                    .offset(x: max(offset + gestureOffset, 0))
+                    .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
+            }
+            .gesture(
+                DragGesture()
+                    .updating($gestureOffset) { value, out, _ in
+                        if value.translation.width > 0 && showSidebar {
+                            out = value.translation.width * 0.1
+                        } else {
+                            out = min(value.translation.width, sidebarWidth)
+                        }
+                    }
+                    .onEnded(onDragEnd)
+            )
+            .onChange(of: showSidebar) { _, newValue in
+                withAnimation {
+                    offset = newValue ? sidebarWidth : 0
+                }
             }
         }
-        .background(Color(.systemBackground))
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    // Detect swipe right from left edge to show sidebar
-                    if value.startLocation.x < 50 && // Started near left edge
-                        value.translation.width > 75 &&   // Swiped right at least 75 points
-                       abs(value.translation.height) < 200 && // Mostly horizontal swipe
-                       !showSidebar {                 // Only if sidebar is currently hidden
-                        withAnimation(.easeInOut(duration: 0.10)) {
-                            showSidebar = true
-                        }
-                    }
-                    // Detect swipe left to hide sidebar when it's shown
-                    else if value.translation.width < -75 && // Swiped left at least 75 points
-                            abs(value.translation.height) < 200 && // Mostly horizontal swipe
-                            showSidebar {                     // Only if sidebar is currently shown
-                        withAnimation(.easeInOut(duration: 0.10)) {
-                            showSidebar = false
-                        }
-                    }
-                }
-        )
         .onAppear {
             // Initialize with first session or create one if none exist
             if sessionManager.sessions.isEmpty {
@@ -117,9 +129,7 @@ struct AeruView: View {
                 // Sidebar toggle
                 Button(action: { 
                     isMessageFieldFocused = false
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showSidebar.toggle()
-                    }
+                    showSidebar.toggle()
                 }) {
                     Image(systemName: showSidebar ? "sidebar.left" : "sidebar.leading")
                         .font(.title3)
@@ -315,6 +325,25 @@ struct AeruView: View {
                 print("Error processing message: \(error)")
             }
         }
+    }
+    
+    private func onDragEnd(value: DragGesture.Value) {
+        let translation = value.translation.width
+        if translation > 0 && translation > (sidebarWidth * 0.6) {
+            showSidebar = true
+        } else if -translation > (sidebarWidth / 2) {
+            showSidebar = false
+        } else {
+            if offset == 0 || !showSidebar {
+                return
+            }
+            showSidebar = true
+        }
+    }
+    
+    private func getOverlayOpacity() -> CGFloat {
+        let progress = (offset + gestureOffset) / sidebarWidth
+        return min(progress * 0.4, 0.4) // Max opacity of 0.4
     }
 }
 
