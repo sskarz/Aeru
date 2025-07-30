@@ -154,13 +154,7 @@ struct AeruView: View {
                 }
                 
                 Spacer()
-                
-                Button(action: { showKnowledgeBase.toggle() }) {
-                    Image(systemName: "books.vertical")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                        .frame(width: 24, height: 24)
-                }
+    
             }
             
             
@@ -263,8 +257,21 @@ struct AeruView: View {
     
     private var inputView: some View {
         VStack(spacing: 12) {
-            // Text input and send button
+            // Upload button, text input and send button
             HStack(spacing: 12) {
+                // Document upload button
+                Button(action: { showKnowledgeBase.toggle() }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.blue)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color(.systemGray6))
+                        )
+                }
+                .glassEffect(.regular)
+                
                 TextField("Type a message...", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .focused($isMessageFieldFocused)
