@@ -38,13 +38,24 @@ class ChatSessionManager: ObservableObject {
     }
     
     func createNewSession(title: String = "New Chat") -> ChatSession? {
-        guard let newSession = databaseManager.createChatSession(title: title) else {
+        // Check for duplicate titles (case-insensitive)
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if titleExists(normalizedTitle) {
+            return nil
+        }
+        
+        guard let newSession = databaseManager.createChatSession(title: normalizedTitle) else {
             return nil
         }
         
         sessions.insert(newSession, at: 0)
         currentSession = newSession
         return newSession
+    }
+    
+    func titleExists(_ title: String) -> Bool {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return sessions.contains { $0.title.lowercased() == normalizedTitle }
     }
     
     func deleteSession(_ session: ChatSession) {
@@ -56,9 +67,15 @@ class ChatSessionManager: ObservableObject {
         }
     }
     
-    func updateSessionTitle(_ session: ChatSession, title: String) {
+    func updateSessionTitle(_ session: ChatSession, title: String) -> Bool {
+        // Check for duplicate titles (excluding current session)
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if sessions.contains(where: { $0.id != session.id && $0.title.lowercased() == normalizedTitle.lowercased() }) {
+            return false
+        }
+        
         var updatedSession = session
-        updatedSession.title = title
+        updatedSession.title = normalizedTitle
         updatedSession.updatedAt = Date()
         
         databaseManager.updateChatSession(updatedSession)
@@ -70,6 +87,8 @@ class ChatSessionManager: ObservableObject {
         if currentSession?.id == session.id {
             currentSession = updatedSession
         }
+        
+        return true
     }
     
     func selectSession(_ session: ChatSession) {
