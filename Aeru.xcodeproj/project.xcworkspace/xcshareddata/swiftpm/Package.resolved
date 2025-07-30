@@ -1,0 +1,42 @@
+{
+  "originHash" : "34423f72f2957f4d2ee87f3e62daa7410c721b8fab4f216d676d95544383663b",
+  "pins" : [
+    {
+      "identity" : "sqlite.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/stephencelis/SQLite.swift.git",
+      "state" : {
+        "revision" : "392dd6058624d9f6c5b4c769d165ddd8c7293394",
+        "version" : "0.15.4"
+      }
+    },
+    {
+      "identity" : "svdb",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Dripfarm/SVDB.git",
+      "state" : {
+        "revision" : "01e78b8bb9423e40201db450180f731c9a67c554",
+        "version" : "2.0.0"
+      }
+    },
+    {
+      "identity" : "swift-toolchain-sqlite",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-toolchain-sqlite",
+      "state" : {
+        "revision" : "b626d3002773b1a1304166643e7f118f724b2132",
+        "version" : "1.0.4"
+      }
+    },
+    {
+      "identity" : "swiftsoup",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/scinfu/SwiftSoup",
+      "state" : {
+        "revision" : "d1d6add8f277bd76992a0f7e72961a896609b707",
+        "version" : "2.9.5"
+      }
+    }
+  ],
+  "version" : 3
+}
