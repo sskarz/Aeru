@@ -163,23 +163,6 @@ struct AeruView: View {
                 }
             }
             
-            // Mode toggles
-            HStack(spacing: 20) {
-                Toggle("RAG Mode", isOn: $useRAG)
-                    .toggleStyle(.switch)
-                    .tint(.green)
-                    .onChange(of: useRAG) { oldValue, newValue in
-                        if newValue { useWebSearch = false }
-                    }
-                
-                Toggle("Web Search", isOn: $useWebSearch)
-                    .toggleStyle(.switch)
-                    .tint(.blue)
-                    .onChange(of: useWebSearch) { oldValue, newValue in
-                        if newValue { useRAG = false }
-                    }
-            }
-            .font(.subheadline)
             
             Divider()
         }
@@ -279,8 +262,8 @@ struct AeruView: View {
     }
     
     private var inputView: some View {
-        VStack(spacing: 0) {
-            
+        VStack(spacing: 12) {
+            // Text input and send button
             HStack(spacing: 12) {
                 TextField("Type a message...", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -308,9 +291,75 @@ struct AeruView: View {
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .glassEffect()
             }
+            
+            // Mode selection icons
+            HStack(spacing: 24) {
+                // General Mode
+                Button(action: {
+                    useRAG = false
+                    useWebSearch = false
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 20))
+                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill((!useRAG && !useWebSearch) ? Color.blue.opacity(0.1) : Color.clear)
+                            )
+                        Text("General")
+                            .font(.caption2)
+                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
+                    }
+                }
+                
+                // RAG Mode
+                Button(action: {
+                    useRAG = true
+                    useWebSearch = false
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "books.vertical.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(useRAG ? .green : .gray)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(useRAG ? Color.green.opacity(0.1) : Color.clear)
+                            )
+                        Text("RAG")
+                            .font(.caption2)
+                            .foregroundColor(useRAG ? .green : .gray)
+                    }
+                }
+                
+                // Web Search Mode
+                Button(action: {
+                    useRAG = false
+                    useWebSearch = true
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "globe.americas.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(useWebSearch ? .blue : .gray)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(useWebSearch ? Color.blue.opacity(0.1) : Color.clear)
+                            )
+                        Text("Web")
+                            .font(.caption2)
+                            .foregroundColor(useWebSearch ? .blue : .gray)
+                    }
+                }
+                
+                Spacer()
+            }
             .padding(.horizontal, 20)
-            .padding(.vertical, 16)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .background(Color(.systemBackground))
         .glassEffect()
     }
