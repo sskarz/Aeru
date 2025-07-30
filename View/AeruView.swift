@@ -11,6 +11,11 @@ import Combine
 import UniformTypeIdentifiers
 import WebKit
 
+struct BrowserURL: Identifiable {
+    let id = UUID()
+    let url: String
+}
+
 struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
@@ -21,8 +26,7 @@ struct AeruView: View {
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
     @State private var showSidebar: Bool = false
-    @State private var showWebBrowser: Bool = false
-    @State private var webBrowserURL: String = ""
+    @State private var webBrowserURL: BrowserURL? = nil
     @FocusState private var isMessageFieldFocused: Bool
 
     var body: some View {
@@ -101,8 +105,8 @@ struct AeruView: View {
                 KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry)
             }
         }
-        .sheet(isPresented: $showWebBrowser) {
-            WebBrowserView(url: webBrowserURL)
+        .sheet(item: $webBrowserURL) { browserURL in
+            WebBrowserView(url: browserURL.url)
         }
     }
     
@@ -176,8 +180,9 @@ struct AeruView: View {
                     
                     ForEach(llm.chatMessages) { message in
                         ChatBubbleView(message: message) { url in
-                            webBrowserURL = url
-                            showWebBrowser = true
+                            print("LINK TAPPED: \(url)")
+                            webBrowserURL = BrowserURL(url: url)
+                            print("WEBBROWSER URL SET TO: \(webBrowserURL?.url ?? "nil")")
                         }
                         .id(message.id)
                     }
@@ -185,8 +190,9 @@ struct AeruView: View {
                     // Streaming response display
                     if let streamingResponse = llm.userLLMResponse {
                         ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false)) { url in
-                            webBrowserURL = url
-                            showWebBrowser = true
+                            print("STREAMING LINK TAPPED: \(url)")
+                            webBrowserURL = BrowserURL(url: url)
+                            print("STREAMING WEBBROWSER URL SET TO: \(webBrowserURL?.url ?? "nil")")
                         }
                         .id("streaming")
                     }
@@ -351,6 +357,8 @@ struct ChatBubbleView: View {
                         
                         ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
                             Button(action: {
+                                print("BUTTON TAPPED - Source URL: \(source.url)")
+                                print("CALLING onLinkTap with: \(source.url)")
                                 onLinkTap?(source.url)
                             }) {
                                 HStack(alignment: .top, spacing: 4) {
@@ -576,85 +584,46 @@ struct KnowledgeBaseView: View {
     }
 }
 
+
 struct WebBrowserView: View {
     let url: String
     @Environment(\.dismiss) private var dismiss
-    @State private var isLoading = true
-    @State private var canGoBack = false
-    @State private var canGoForward = false
-    @State private var webView: WKWebView?
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                if isLoading {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text("Loading...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.systemGray6))
+            WebView(url: url)
+                .id(url) // Force recreation when URL changes
+                .onAppear {
+                    print("WEBBROWSERVIEW APPEARED WITH URL: '\(url)'")
                 }
-                
-                WebView(url: url, 
-                       isLoading: $isLoading,
-                       canGoBack: $canGoBack,
-                       canGoForward: $canGoForward,
-                       webView: $webView)
-            }
-            .navigationTitle("Web Browser")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigationBarLeading) {
-                    Button(action: {
-                        webView?.goBack()
-                    }) {
-                        Image(systemName: "chevron.left")
-                    }
-                    .disabled(!canGoBack)
-                    
-                    Button(action: {
-                        webView?.goForward()
-                    }) {
-                        Image(systemName: "chevron.right")
-                    }
-                    .disabled(!canGoForward)
-                    
-                    Button(action: {
-                        webView?.reload()
-                    }) {
-                        Image(systemName: "arrow.clockwise")
+                .navigationTitle("Web Browser")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            dismiss()
+                        }
                     }
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
     }
 }
 
 struct WebView: UIViewRepresentable {
     let url: String
-    @Binding var isLoading: Bool
-    @Binding var canGoBack: Bool
-    @Binding var canGoForward: Bool
-    @Binding var webView: WKWebView?
+
+    // No need for a static process pool unless you're sharing it across many distinct views
     
     func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView()
-        webView.navigationDelegate = context.coordinator
-        self.webView = webView
+        print("\nWEB BROWSER URL: ", url)
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
         
-        if let url = URL(string: url) {
-            let request = URLRequest(url: url)
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        
+        // Load the initial URL directly
+        if let validURL = URL(string: self.url) {
+            let request = URLRequest(url: validURL)
             webView.load(request)
         }
         
@@ -662,32 +631,12 @@ struct WebView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        // No updates needed
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, WKNavigationDelegate {
-        let parent: WebView
+        // This logic is good! It prevents unnecessary reloads.
+        guard let currentURL = uiView.url?.absoluteString, currentURL != url else { return }
         
-        init(_ parent: WebView) {
-            self.parent = parent
-        }
-        
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            parent.isLoading = true
-        }
-        
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            parent.isLoading = false
-            parent.canGoBack = webView.canGoBack
-            parent.canGoForward = webView.canGoForward
-        }
-        
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            parent.isLoading = false
+        if let validURL = URL(string: self.url) {
+            let request = URLRequest(url: validURL)
+            uiView.load(request)
         }
     }
 }
