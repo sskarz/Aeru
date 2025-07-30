@@ -283,6 +283,7 @@ struct AeruView: View {
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 24))
                     .lineLimit(1...4)
+                    .glassEffect()
                 
                 Button(action: sendMessage) {
                     Image(systemName: "paperplane.fill")
@@ -296,6 +297,7 @@ struct AeruView: View {
                         )
                 }
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .glassEffect()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
