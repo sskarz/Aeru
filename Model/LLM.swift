@@ -184,11 +184,7 @@ class LLM: ObservableObject {
         for result in results {
             let chunks = webSearch.chunkText(result.content)
             for chunk in chunks {
-                let chunkWithSource = """
-                Source: \(result.title) (\(result.url))
-                Content: \(chunk)
-                """
-                await rag.addEntry(chunkWithSource)
+                await rag.addEntry(chunk)
             }
         }
         

@@ -300,11 +300,10 @@ class WebSearchService {
         return true
     }
     
-    // Chunk large text content for embedding
+    // Chunk text content into individual sentences for embedding
     func chunkText(_ text: String, maxLength: Int = 800) -> [String] {
         let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;"))
         var chunks: [String] = []
-        var currentChunk = ""
         
         for sentence in sentences {
             let trimmedSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -312,26 +311,12 @@ class WebSearchService {
             
             let sentenceWithPeriod = trimmedSentence + "."
             
-            // If adding this sentence would exceed maxLength, start a new chunk
-            if !currentChunk.isEmpty && (currentChunk.count + sentenceWithPeriod.count + 1) > maxLength {
-                if !currentChunk.isEmpty {
-                    chunks.append(currentChunk.trimmingCharacters(in: .whitespacesAndNewlines))
-                }
-                currentChunk = sentenceWithPeriod
-            } else {
-                if currentChunk.isEmpty {
-                    currentChunk = sentenceWithPeriod
-                } else {
-                    currentChunk += " " + sentenceWithPeriod
-                }
+            // Only include sentences that are substantial enough (more than 20 characters)
+            if sentenceWithPeriod.count > 20 {
+                chunks.append(sentenceWithPeriod)
             }
         }
         
-        // Add the last chunk if it's not empty
-        if !currentChunk.isEmpty {
-            chunks.append(currentChunk.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
-        
-        return chunks.filter { $0.count > 50 } // Filter out very short chunks
+        return chunks
     }
 }
