@@ -69,7 +69,7 @@ struct AeruView: View {
                 .onEnded { value in
                     // Detect swipe right from left edge to show sidebar
                     if value.startLocation.x < 50 && // Started near left edge
-                        value.translation.width > 100 &&   // Swiped right at least 100 points
+                        value.translation.width > 75 &&   // Swiped right at least 75 points
                        abs(value.translation.height) < 200 && // Mostly horizontal swipe
                        !showSidebar {                 // Only if sidebar is currently hidden
                         withAnimation(.easeInOut(duration: 0.10)) {
@@ -77,7 +77,7 @@ struct AeruView: View {
                         }
                     }
                     // Detect swipe left to hide sidebar when it's shown
-                    else if value.translation.width < -100 && // Swiped left at least 100 points
+                    else if value.translation.width < -75 && // Swiped left at least 75 points
                             abs(value.translation.height) < 200 && // Mostly horizontal swipe
                             showSidebar {                     // Only if sidebar is currently shown
                         withAnimation(.easeInOut(duration: 0.10)) {
