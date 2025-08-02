@@ -40,6 +40,10 @@ struct AeruView: View {
         UIScreen.main.bounds.width * 0.8
     }
 
+    private var isModelResponding: Bool {
+        llm.userLLMResponse != nil || llm.isWebSearching
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -292,11 +296,11 @@ struct AeruView: View {
                         .frame(width: 40, height: 40)
                         .background(
                             Circle()
-                                .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
+                                .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding ? 
                                       Color.gray.opacity(0.6) : Color.blue)
                         )
                 }
-                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding)
                 .glassEffect(.regular.interactive())
             }
             
