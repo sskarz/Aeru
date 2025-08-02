@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		684097A92E3DC29700EE87CF /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 684097A82E3DC29700EE87CF /* MarkdownUI */; };
 		684C44A42E3444080093FD7D /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = 684C44A32E3444080093FD7D /* SQLite */; };
 		685AAA9E2E268842008B5063 /* SVDB in Frameworks */ = {isa = PBXBuildFile; productRef = 685AAA9D2E268842008B5063 /* SVDB */; };
 		68AE0FD32E2B1B5400D359D7 /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 68AE0FD22E2B1B5400D359D7 /* SwiftSoup */; };
@@ -45,6 +46,7 @@
 				684C44A42E3444080093FD7D /* SQLite in Frameworks */,
 				685AAA9E2E268842008B5063 /* SVDB in Frameworks */,
 				68AE0FD32E2B1B5400D359D7 /* SwiftSoup in Frameworks */,
+				684097A92E3DC29700EE87CF /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +92,7 @@
 				685AAA9D2E268842008B5063 /* SVDB */,
 				68AE0FD22E2B1B5400D359D7 /* SwiftSoup */,
 				684C44A32E3444080093FD7D /* SQLite */,
+				684097A82E3DC29700EE87CF /* MarkdownUI */,
 			);
 			productName = RAGSearchLLM;
 			productReference = 685AAA8B2E268669008B5063 /* Aeru.app */;
@@ -123,6 +126,7 @@
 				685AAA9C2E268842008B5063 /* XCRemoteSwiftPackageReference "SVDB" */,
 				68AE0FD12E2B1B5400D359D7 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 				684C44A22E3444080093FD7D /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+				684097A72E3DC29700EE87CF /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 685AAA8C2E268669008B5063 /* Products */;
@@ -368,6 +372,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		684097A72E3DC29700EE87CF /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
 		684C44A22E3444080093FD7D /* XCRemoteSwiftPackageReference "SQLite.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/stephencelis/SQLite.swift.git";
@@ -395,6 +407,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		684097A82E3DC29700EE87CF /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 684097A72E3DC29700EE87CF /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
 		684C44A32E3444080093FD7D /* SQLite */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 684C44A22E3444080093FD7D /* XCRemoteSwiftPackageReference "SQLite.swift" */;

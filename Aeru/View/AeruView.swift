@@ -11,6 +11,7 @@ import Combine
 import UniformTypeIdentifiers
 import WebKit
 import UIKit
+import MarkdownUI
 
 
 struct BrowserURL: Identifiable {
@@ -430,15 +431,27 @@ struct ChatBubbleView: View {
             }
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
-                Text(message.text)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(message.isUser ? Color.blue : Color(.systemGray5))
-                    )
-                    .foregroundColor(message.isUser ? .white : .primary)
+                if message.isUser {
+                    Text(message.text)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.blue)
+                        )
+                        .foregroundColor(.white)
+                } else {
+                    Markdown(message.text)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color(.systemGray5))
+                        )
+                        .foregroundColor(.primary)
+                }
                 
                 // Web sources
                 if let sources = message.sources, !sources.isEmpty {
