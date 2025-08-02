@@ -270,7 +270,7 @@ struct AeruView: View {
                                 .fill(Color(.systemGray6))
                         )
                 }
-                .glassEffect(.regular)
+                .glassEffect(.regular.interactive())
                 
                 TextField("Type a message...", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -282,7 +282,7 @@ struct AeruView: View {
                     .lineLimit(1...2)
                     .textInputAutocapitalization(.sentences)
                     .disableAutocorrection(false)
-                    .glassEffect(.regular)
+                    .glassEffect(.regular.interactive())
                 
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up")
@@ -296,7 +296,7 @@ struct AeruView: View {
                         )
                 }
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .glassEffect(.regular)
+                .glassEffect(.regular.interactive())
             }
             
             // Mode selection icons
@@ -335,7 +335,7 @@ struct AeruView: View {
                                 Circle()
                                     .fill(useRAG ? Color.green.opacity(0.1) : Color.clear)
                             )
-                        Text("RAG")
+                        Text("Docs")
                             .font(.caption2)
                             .foregroundColor(useRAG ? .green : .gray)
                     }
@@ -704,7 +704,7 @@ struct WebBrowserView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color(.systemBackground))
-                .glassEffect()
+                .glassEffect(.regular.interactive())
                 
                 Divider()
                 
