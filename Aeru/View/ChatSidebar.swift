@@ -49,15 +49,6 @@ struct ChatSidebar: View {
                         
                         Spacer()
                         
-                        Button(action: { 
-                            isSelectionMode = true 
-                        }) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.title3)
-                                .foregroundColor(.blue)
-                                .frame(width: 24, height: 24)
-                        }
-                        
                         Button(action: { showingNewChatAlert = true }) {
                             Image(systemName: "plus")
                                 .font(.title3)
@@ -107,30 +98,38 @@ struct ChatSidebar: View {
             }
             .frame(maxHeight: .infinity)
             
-            // Settings button at bottom
+            // Bottom controls
             VStack(spacing: 0) {
                 Divider()
                 
-                Button(action: { showingSettings = true }) {
-                    HStack {
-                        Image(systemName: "gear")
+                HStack {
+                    Button(action: { showingSettings = true }) {
+                        HStack {
+                            Image(systemName: "gear")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                            
+                            Text("Settings")
+                                .font(.body)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Spacer()
+                    
+                    Button(action: { 
+                        isSelectionMode = true 
+                    }) {
+                        Image(systemName: "checkmark.circle")
                             .font(.title3)
                             .foregroundColor(.blue)
-                        
-                        Text("Settings")
-                            .font(.body)
-                            .foregroundColor(.blue)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .frame(width: 24, height: 24)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
             }
         }
         .background(Color(.systemBackground))
