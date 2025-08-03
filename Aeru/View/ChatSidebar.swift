@@ -1,3 +1,10 @@
+//
+//  ChatSidebar.swift
+//  Aeru
+//
+//  Created by Sanskar
+//
+
 import SwiftUI
 import Foundation
 

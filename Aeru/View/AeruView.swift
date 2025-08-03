@@ -22,6 +22,7 @@ struct BrowserURL: Identifiable {
 struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
+    @StateObject private var networkConnectivity = NetworkConnectivity()
     
     @State private var messageText: String = ""
     @State private var useRAG: Bool = false
@@ -30,6 +31,7 @@ struct AeruView: View {
     @State private var newEntry: String = ""
     @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
+    @State private var showConnectivityAlert: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
     // Sidebar animation properties
@@ -134,6 +136,11 @@ struct AeruView: View {
         }
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
+        }
+        .alert("No Internet Connection", isPresented: $showConnectivityAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Please turn on cellular or WiFi to use web search functionality.")
         }
     }
     
@@ -380,6 +387,12 @@ struct AeruView: View {
     private func sendMessage() {
         let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedMessage.isEmpty, let currentSession = sessionManager.currentSession else { return }
+        
+        // Check connectivity for web search
+        if useWebSearch && !NetworkConnectivity.hasActiveConnection() {
+            showConnectivityAlert = true
+            return
+        }
         
         // Clear input
         messageText = ""

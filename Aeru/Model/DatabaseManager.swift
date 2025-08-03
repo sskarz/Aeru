@@ -1,3 +1,10 @@
+//
+//  DatabaseManager.swift
+//  Aeru
+//
+//  Created by Sanskar
+//
+
 import Foundation
 import SQLite
 

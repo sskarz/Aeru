@@ -1,3 +1,10 @@
+//
+//  RAGModel.swift
+//  Aeru
+//
+//  Created by Sanskar
+//
+
 import Foundation
 import Accelerate
 import CoreML

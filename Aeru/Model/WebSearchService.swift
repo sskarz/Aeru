@@ -1,4 +1,10 @@
-// Move the web search-related logic from RAGView.swift to this new file.
+//
+//  WebSearchService.swift
+//  Aeru
+//
+//  Created by Sanskar
+//
+
 import Foundation
 import SwiftSoup
 import NaturalLanguage
