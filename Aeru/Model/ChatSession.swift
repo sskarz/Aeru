@@ -72,6 +72,21 @@ class ChatSessionManager: ObservableObject {
         }
     }
     
+    func deleteSessions(_ sessionIds: Set<String>) {
+        // Delete from database
+        for sessionId in sessionIds {
+            databaseManager.deleteChatSession(sessionId)
+        }
+        
+        // Remove from sessions array
+        sessions.removeAll { sessionIds.contains($0.id) }
+        
+        // Update current session if it was deleted
+        if let current = currentSession, sessionIds.contains(current.id) {
+            currentSession = sessions.first
+        }
+    }
+    
     func updateSessionTitle(_ session: ChatSession, title: String) -> Bool {
         // Check for duplicate titles (excluding current session)
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
