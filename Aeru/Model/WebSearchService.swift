@@ -1,6 +1,7 @@
 // Move the web search-related logic from RAGView.swift to this new file.
 import Foundation
 import SwiftSoup
+import NaturalLanguage
 
 struct WebSearchResult: Codable {
     let title: String
@@ -300,41 +301,93 @@ class WebSearchService {
         return true
     }
     
-    // Chunk text content into segments of approximately 1000 characters, ending in complete sentences
-    func chunkText(_ text: String, maxLength: Int = 1000) -> [String] {
+    private func countTokens(in text: String) -> Int {
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = text
+        
+        let tokens = tokenizer.tokens(for: text.startIndex..<text.endIndex)
+        return tokens.count
+    }
+    
+    // Chunk text content into segments with token-based sizing and overlap
+    func chunkText(_ text: String, maxLength: Int = 1000, overlapTokens: Int = 100) -> [String] {
+        // Convert maxLength from characters to approximate tokens (roughly 4 chars per token)
+        let maxTokens = maxLength / 4
+        
         let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.count > 20 } // Only substantial sentences
+            .map { sentence in
+                sentence.hasSuffix(".") || sentence.hasSuffix("!") || sentence.hasSuffix("?") || sentence.hasSuffix(";") ? 
+                sentence : sentence + "."
+            }
+        
         var chunks: [String] = []
         var currentChunk = ""
+        var currentTokenCount = 0
+        var previousChunkSentences: [String] = []
         
         for sentence in sentences {
-            let trimmedSentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedSentence.isEmpty { continue }
+            let sentenceTokenCount = countTokens(in: sentence)
+            let potentialChunk = currentChunk.isEmpty ? sentence : currentChunk + " " + sentence
+            let potentialTokenCount = currentTokenCount + sentenceTokenCount + (currentChunk.isEmpty ? 0 : 1)
             
-            let sentenceWithPeriod = trimmedSentence + "."
-            
-            // Only include sentences that are substantial enough (more than 20 characters)
-            if sentenceWithPeriod.count > 20 {
-                // Check if adding this sentence would exceed maxLength
-                let proposedChunk = currentChunk.isEmpty ? sentenceWithPeriod : currentChunk + " " + sentenceWithPeriod
+            if potentialTokenCount <= maxTokens {
+                currentChunk = potentialChunk
+                currentTokenCount = potentialTokenCount
+            } else {
+                // Current chunk is ready, save it
+                if !currentChunk.isEmpty {
+                    chunks.append(currentChunk)
+                    
+                    // Store sentences for overlap calculation
+                    let chunkSentences = currentChunk.components(separatedBy: CharacterSet(charactersIn: ".!?;"))
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+                    previousChunkSentences = chunkSentences
+                }
                 
-                if proposedChunk.count <= maxLength {
-                    // Add sentence to current chunk
-                    currentChunk = proposedChunk
-                } else {
-                    // Current chunk is full, save it and start a new one
-                    if !currentChunk.isEmpty {
-                        chunks.append(currentChunk)
+                // Start new chunk with overlap from previous chunk
+                var overlapText = ""
+                var overlapTokenCount = 0
+                
+                if !previousChunkSentences.isEmpty && chunks.count > 0 {
+                    // Take sentences from the end of previous chunk for overlap
+                    for sentenceIndex in stride(from: previousChunkSentences.count - 1, through: 0, by: -1) {
+                        let overlapSentence = previousChunkSentences[sentenceIndex]
+                        let overlapSentenceTokens = countTokens(in: overlapSentence)
+                        
+                        if overlapTokenCount + overlapSentenceTokens <= overlapTokens {
+                            overlapText = overlapSentence + (overlapText.isEmpty ? "" : " " + overlapText)
+                            overlapTokenCount += overlapSentenceTokens
+                        } else {
+                            break
+                        }
                     }
-                    currentChunk = sentenceWithPeriod
+                }
+                
+                // Start new chunk with overlap + current sentence
+                if sentenceTokenCount <= maxTokens {
+                    if !overlapText.isEmpty {
+                        currentChunk = overlapText + " " + sentence
+                        currentTokenCount = overlapTokenCount + sentenceTokenCount + 1
+                    } else {
+                        currentChunk = sentence
+                        currentTokenCount = sentenceTokenCount
+                    }
+                } else {
+                    // Sentence is too long, just start with it (will be handled in next iteration)
+                    currentChunk = sentence
+                    currentTokenCount = sentenceTokenCount
                 }
             }
         }
         
-        // Don't forget the last chunk
+        // Add the final chunk if not empty
         if !currentChunk.isEmpty {
             chunks.append(currentChunk)
         }
         
-        return chunks
+        return chunks.filter { !$0.isEmpty }
     }
 }

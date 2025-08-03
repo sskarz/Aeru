@@ -11,6 +11,7 @@ import Combine
 import UniformTypeIdentifiers
 import WebKit
 import UIKit
+import MarkdownUI
 
 
 struct BrowserURL: Identifiable {
@@ -39,6 +40,10 @@ struct AeruView: View {
         UIScreen.main.bounds.width * 0.8
     }
 
+    private var isModelResponding: Bool {
+        llm.userLLMResponse != nil || llm.isWebSearching
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -146,11 +151,13 @@ struct AeruView: View {
                         .frame(width: 24, height: 24)
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .center, spacing: 2) {
                     Text(sessionManager.currentSession?.displayTitle ?? "RAG Chat Assistant")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
                 }
                 
                 Spacer()
@@ -270,7 +277,7 @@ struct AeruView: View {
                                 .fill(Color(.systemGray6))
                         )
                 }
-                .glassEffect(.regular)
+                .glassEffect(.regular.interactive())
                 
                 TextField("Type a message...", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -282,7 +289,7 @@ struct AeruView: View {
                     .lineLimit(1...2)
                     .textInputAutocapitalization(.sentences)
                     .disableAutocorrection(false)
-                    .glassEffect(.regular)
+                    .glassEffect(.regular.interactive())
                 
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up")
@@ -291,12 +298,12 @@ struct AeruView: View {
                         .frame(width: 40, height: 40)
                         .background(
                             Circle()
-                                .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
+                                .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding ? 
                                       Color.gray.opacity(0.6) : Color.blue)
                         )
                 }
-                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .glassEffect(.regular)
+                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding)
+                .glassEffect(.regular.interactive())
             }
             
             // Mode selection icons
@@ -335,7 +342,7 @@ struct AeruView: View {
                                 Circle()
                                     .fill(useRAG ? Color.green.opacity(0.1) : Color.clear)
                             )
-                        Text("RAG")
+                        Text("Docs")
                             .font(.caption2)
                             .foregroundColor(useRAG ? .green : .gray)
                     }
@@ -430,15 +437,27 @@ struct ChatBubbleView: View {
             }
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
-                Text(message.text)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(message.isUser ? Color.blue : Color(.systemGray5))
-                    )
-                    .foregroundColor(message.isUser ? .white : .primary)
+                if message.isUser {
+                    Text(message.text)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.blue)
+                        )
+                        .foregroundColor(.white)
+                } else {
+                    Markdown(message.text)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color(.systemGray5))
+                        )
+                        .foregroundColor(.primary)
+                }
                 
                 // Web sources
                 if let sources = message.sources, !sources.isEmpty {
@@ -704,7 +723,7 @@ struct WebBrowserView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color(.systemBackground))
-                .glassEffect()
+                .glassEffect(.regular.interactive())
                 
                 Divider()
                 
