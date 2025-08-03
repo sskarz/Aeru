@@ -151,11 +151,13 @@ struct AeruView: View {
                         .frame(width: 24, height: 24)
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .center, spacing: 2) {
                     Text(sessionManager.currentSession?.displayTitle ?? "RAG Chat Assistant")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
                 }
                 
                 Spacer()
