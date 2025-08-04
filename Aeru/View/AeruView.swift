@@ -47,7 +47,11 @@ struct AeruView: View {
     }
     
     private var shouldDisableNewChatButton: Bool {
-        llm.chatMessages.isEmpty || isModelResponding
+        // Enable if no sessions exist (user needs a way to create first chat)
+        guard !sessionManager.sessions.isEmpty else { return false }
+        
+        // Disable if current chat is empty (new chat with 0 messages) or model is responding
+        return llm.chatMessages.isEmpty || isModelResponding
     }
     
     private var useWebSearch: Bool {
@@ -105,7 +109,7 @@ struct AeruView: View {
                 )
                 
                 // Sidebar
-                ChatSidebar(sessionManager: sessionManager)
+                ChatSidebar(sessionManager: sessionManager, shouldDisableNewChatButton: shouldDisableNewChatButton)
                     .frame(width: sidebarWidth)
                     .offset(x: -sidebarWidth)
                     .offset(x: max(offset + gestureOffset, 0))

@@ -11,6 +11,7 @@ import Foundation
 
 struct ChatSidebar: View {
     @ObservedObject var sessionManager: ChatSessionManager
+    let shouldDisableNewChatButton: Bool
     @State private var editingSession: ChatSession?
     @State private var editTitle = ""
     @State private var showingDuplicateTitleAlert = false
@@ -59,9 +60,10 @@ struct ChatSidebar: View {
                         }) {
                             Image(systemName: "plus")
                                 .font(.title3)
-                                .foregroundColor(.blue)
+                                .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
                                 .frame(width: 24, height: 24)
                         }
+                        .disabled(shouldDisableNewChatButton)
                     }
                 }
                 .padding(.horizontal, 16)
