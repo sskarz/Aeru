@@ -498,6 +498,7 @@ class LLM: ObservableObject {
                     
                     Answer:
                     """
+        print("--------------------\nMODEL TRANSCRIPT:\n ", session.transcript)
         
         do {
             let responseStream = session.streamResponse(to: prompt)
