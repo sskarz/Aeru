@@ -62,6 +62,26 @@ class LLM: ObservableObject {
         return newRAG
     }
     
+    func sessionHasDocuments(_ session: ChatSession) -> Bool {
+        let documents = databaseManager.getDocuments(for: session.id)
+        return !documents.isEmpty
+    }
+    
+    func queryIntelligently(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager, useWebSearch: Bool) async throws {
+        // Intelligent routing logic:
+        // 1. If web search is toggled, use web search
+        // 2. If session has 1 or more documents, use RAG
+        // 3. Else use general query
+        
+        if useWebSearch {
+            try await webSearch(UIQuery, for: chatSession, sessionManager: sessionManager)
+        } else if sessionHasDocuments(chatSession) {
+            try await queryLLM(UIQuery, for: chatSession, sessionManager: sessionManager)
+        } else {
+            try await queryLLMGeneral(UIQuery, for: chatSession, sessionManager: sessionManager)
+        }
+    }
+    
     func switchToSession(_ session: ChatSession) {
         currentSessionId = session.id
         loadMessagesForCurrentSession()

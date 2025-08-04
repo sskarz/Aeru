@@ -25,7 +25,6 @@ struct AeruView: View {
     @StateObject private var networkConnectivity = NetworkConnectivity()
     
     @State private var messageText: String = ""
-    @State private var useRAG: Bool = false
     @State private var useWebSearch: Bool = false
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
@@ -315,50 +314,10 @@ struct AeruView: View {
             
             // Mode selection icons
             HStack(spacing: 24) {
-                // General Mode
-                Button(action: {
-                    useRAG = false
-                    useWebSearch = false
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 20))
-                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill((!useRAG && !useWebSearch) ? Color.blue.opacity(0.1) : Color.clear)
-                            )
-                        Text("General")
-                            .font(.caption2)
-                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
-                    }
-                }
-                
-                // RAG Mode
-                Button(action: {
-                    useRAG = true
-                    useWebSearch = false
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "books.vertical.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(useRAG ? .green : .gray)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(useRAG ? Color.green.opacity(0.1) : Color.clear)
-                            )
-                        Text("Docs")
-                            .font(.caption2)
-                            .foregroundColor(useRAG ? .green : .gray)
-                    }
-                }
                 
                 // Web Search Mode
                 Button(action: {
-                    useRAG = false
-                    useWebSearch = true
+                    useWebSearch.toggle()
                 }) {
                     VStack(spacing: 4) {
                         Image(systemName: "globe.americas.fill")
@@ -397,17 +356,10 @@ struct AeruView: View {
         // Clear input
         messageText = ""
         
-        // Send to appropriate service
+        // Send to appropriate service using intelligent routing
         Task {
             do {
-                if useWebSearch {
-                    try await llm.webSearch(trimmedMessage, for: currentSession, sessionManager: sessionManager)
-                } else if useRAG {
-                    try await llm.queryLLM(trimmedMessage, for: currentSession, sessionManager: sessionManager)
-                } else {
-                    // When both RAG and Web Search are off, use general query
-                    try await llm.queryLLMGeneral(trimmedMessage, for: currentSession, sessionManager: sessionManager)
-                }
+                try await llm.queryIntelligently(trimmedMessage, for: currentSession, sessionManager: sessionManager, useWebSearch: useWebSearch)
             } catch {
                 print("Error processing message: \(error)")
             }
