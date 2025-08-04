@@ -58,7 +58,7 @@ struct ChatSidebar: View {
                         Button(action: { 
                             _ = sessionManager.createNewSession(title: "")
                         }) {
-                            Image(systemName: "plus")
+                            Image(systemName: "plus.message")
                                 .font(.title3)
                                 .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
                                 .frame(width: 24, height: 24)
