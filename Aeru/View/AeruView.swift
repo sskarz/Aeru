@@ -46,6 +46,10 @@ struct AeruView: View {
         llm.userLLMResponse != nil || llm.isWebSearching
     }
     
+    private var shouldDisableNewChatButton: Bool {
+        llm.chatMessages.isEmpty || isModelResponding
+    }
+    
     private var useWebSearch: Bool {
         sessionManager.currentSession?.useWebSearch ?? false
     }
@@ -191,9 +195,10 @@ struct AeruView: View {
                 Button(action: handleNewChatCreation) {
                     Image(systemName: "plus")
                         .font(.title3)
-                        .foregroundColor(.blue)
+                        .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
                         .frame(width: 24, height: 24)
                 }
+                .disabled(shouldDisableNewChatButton)
                 
             }
             .padding(.horizontal, 16)
