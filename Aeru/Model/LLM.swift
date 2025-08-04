@@ -197,8 +197,11 @@ class LLM: ObservableObject {
         
         // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
+            print("🔍 WebSearch: Generating title for first message. Session ID: \(chatSession.id)")
             let generatedTitle = await generateChatTitle(from: UIQuery)
+            print("🔍 WebSearch: Generated title: '\(generatedTitle)'")
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+            print("🔍 WebSearch: Title update completed")
         }
         
         // Perform web search and scraping
@@ -365,8 +368,11 @@ class LLM: ObservableObject {
         
         // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
+            print("📚 RAG: Generating title for first message. Session ID: \(chatSession.id)")
             let generatedTitle = await generateChatTitle(from: UIQuery)
+            print("📚 RAG: Generated title: '\(generatedTitle)'")
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+            print("📚 RAG: Title update completed")
         }
         
         let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
@@ -471,8 +477,11 @@ class LLM: ObservableObject {
         
         // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
+            print("💬 General: Generating title for first message. Session ID: \(chatSession.id)")
             let generatedTitle = await generateChatTitle(from: UIQuery)
+            print("💬 General: Generated title: '\(generatedTitle)'")
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+            print("💬 General: Title update completed")
         }
         
         // Create a simple prompt without RAG context or web search results

@@ -120,20 +120,28 @@ class ChatSessionManager: ObservableObject {
     
     func updateSessionTitleIfEmpty(_ session: ChatSession, with newTitle: String) {
         // Only update if the session currently has an empty title
-        guard session.title.isEmpty else { return }
+        guard session.title.isEmpty else { 
+            print("⚠️ SessionManager: Skipping title update - session already has title: '\(session.title)'")
+            return 
+        }
+        
+        print("🔄 SessionManager: Updating empty title to: '\(newTitle)' for session: \(session.id)")
         
         var updatedSession = session
         updatedSession.title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         updatedSession.updatedAt = Date()
         
         databaseManager.updateChatSession(updatedSession)
+        print("💾 SessionManager: Updated session in database")
         
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             sessions[index] = updatedSession
+            print("📝 SessionManager: Updated session in sessions array at index \(index)")
         }
         
         if currentSession?.id == session.id {
             currentSession = updatedSession
+            print("✅ SessionManager: Updated currentSession with new title")
         }
     }
     
