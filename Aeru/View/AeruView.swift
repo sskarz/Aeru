@@ -548,20 +548,23 @@ struct KnowledgeBaseView: View {
                     .cornerRadius(8)
                 }
                 
-                // Uploaded Documents List
+                // Uploaded Documents
                 if !documents.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        
-                        List(documents, id: \.id) { document in
-                            VStack(alignment: .leading, spacing: 2) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
+                        ForEach(documents, id: \.id) { document in
+                            VStack(spacing: 4) {
+                                Image(systemName: "doc.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.red)
                                 Text(document.name)
-                                    .font(.body)
-                                    .lineLimit(1)
-                                Text("Uploaded: \(document.uploadedAt, style: .date)")
                                     .font(.caption)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
                             }
+                            .frame(width: 120, height: 80)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
                         }
-                        .frame(maxHeight: 150)
                     }
                 }
                 // Knowledge based entries
