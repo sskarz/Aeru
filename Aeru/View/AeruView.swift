@@ -159,7 +159,7 @@ struct AeruView: View {
                 }
                 
                 VStack(alignment: .center, spacing: 2) {
-                    Text(sessionManager.currentSession?.displayTitle ?? "RAG Chat Assistant")
+                    Text(sessionManager.currentSession?.displayTitle ?? "Aeru")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .lineLimit(1)
