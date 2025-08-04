@@ -264,6 +264,9 @@ class LLM: ObservableObject {
                 fullResponse = partialStream.description
             }
             
+            // Clear streaming response first to prevent duplicate display
+            userLLMResponse = nil
+            
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
             chatMessages.append(assistantMessage)
@@ -291,6 +294,9 @@ class LLM: ObservableObject {
                     userLLMResponse = partialStream
                     fullResponse = partialStream.description
                 }
+                
+                // Clear streaming response first to prevent duplicate display
+                userLLMResponse = nil
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
@@ -336,8 +342,6 @@ class LLM: ObservableObject {
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
         
-        // Clear streaming response to prevent duplicate display
-        userLLMResponse = nil
         isWebSearching = false
     }
     
@@ -428,6 +432,9 @@ class LLM: ObservableObject {
                 fullResponse = partialStream.description
             }
             
+            // Clear streaming response first to prevent duplicate display
+            userLLMResponse = nil
+            
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
             chatMessages.append(assistantMessage)
@@ -455,6 +462,9 @@ class LLM: ObservableObject {
                     userLLMResponse = partialStream
                     fullResponse = partialStream.description
                 }
+                
+                // Clear streaming response first to prevent duplicate display
+                userLLMResponse = nil
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
@@ -499,9 +509,6 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
-        
-        // Clear streaming response to prevent duplicate display
-        userLLMResponse = nil
     }
     
     func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
@@ -545,6 +552,9 @@ class LLM: ObservableObject {
                 fullResponse = partialStream.description
             }
             
+            // Clear streaming response first to prevent duplicate display
+            userLLMResponse = nil
+            
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
             chatMessages.append(assistantMessage)
@@ -572,6 +582,9 @@ class LLM: ObservableObject {
                     userLLMResponse = partialStream
                     fullResponse = partialStream.description
                 }
+                
+                // Clear streaming response first to prevent duplicate display
+                userLLMResponse = nil
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
@@ -616,9 +629,6 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
-        
-        // Clear streaming response to prevent duplicate display
-        userLLMResponse = nil
     }
     
     
