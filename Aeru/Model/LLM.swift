@@ -21,6 +21,9 @@ class LLM: ObservableObject {
     // RAG - now managed per chat session
     private var ragModels: [String: RAGModel] = [:]
     
+    // LLM Sessions - now managed per chat session
+    private var sessions: [String: LanguageModelSession] = [:]
+    
     // LLM Generation
     @Published var userLLMQuery: String = ""
     @Published var userLLMResponse: String.PartiallyGenerated?
@@ -34,8 +37,6 @@ class LLM: ObservableObject {
     @Published var chatMessages: [ChatMessage] = []
     private var currentSessionId: String?
     private let databaseManager = DatabaseManager.shared
-    
-    private lazy var session: LanguageModelSession = LanguageModelSession()
     
     private func newSession(previousSession: LanguageModelSession) -> LanguageModelSession {
         let allEntries = previousSession.transcript
@@ -62,6 +63,17 @@ class LLM: ObservableObject {
         return newRAG
     }
     
+    // Get or create LanguageModelSession for current session
+    private func getSessionForChat(_ sessionId: String) -> LanguageModelSession {
+        if let existingSession = sessions[sessionId] {
+            return existingSession
+        }
+        
+        let newSession = LanguageModelSession()
+        sessions[sessionId] = newSession
+        return newSession
+    }
+    
     func sessionHasDocuments(_ session: ChatSession) -> Bool {
         let documents = databaseManager.getDocuments(for: session.id)
         return !documents.isEmpty
@@ -85,6 +97,9 @@ class LLM: ObservableObject {
     func switchToSession(_ session: ChatSession) {
         currentSessionId = session.id
         loadMessagesForCurrentSession()
+        
+        // Ensure session-specific LanguageModelSession exists
+        _ = getSessionForChat(session.id)
     }
     
     func loadMessagesForCurrentSession() {
@@ -198,7 +213,7 @@ class LLM: ObservableObject {
         // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
             print("🔍 WebSearch: Generating title for first message. Session ID: \(chatSession.id)")
-            let generatedTitle = await generateChatTitle(from: UIQuery)
+            let generatedTitle = await generateChatTitle(from: UIQuery, for: chatSession)
             print("🔍 WebSearch: Generated title: '\(generatedTitle)'")
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
             print("🔍 WebSearch: Title update completed")
@@ -248,6 +263,8 @@ class LLM: ObservableObject {
                     """
         
         // Generate response using LLM
+        let session = getSessionForChat(chatSession.id)
+        
         do {
             let responseStream = session.streamResponse(to: prompt)
             var fullResponse = ""
@@ -263,10 +280,12 @@ class LLM: ObservableObject {
             
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
-            session = newSession(previousSession: session)
+            let newSessionInstance = newSession(previousSession: session)
+            sessions[chatSession.id] = newSessionInstance
+            
             // Retry with new session
             do {
-                let responseStream = session.streamResponse(to: prompt)
+                let responseStream = newSessionInstance.streamResponse(to: prompt)
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
@@ -313,7 +332,7 @@ class LLM: ObservableObject {
         isWebSearching = false
     }
     
-    func generateChatTitle(from prompt: String) async -> String {
+    func generateChatTitle(from prompt: String, for chatSession: ChatSession) async -> String {
         let titlePrompt = """
         Generate a short, descriptive title (3-4 words) for a chat conversation that starts with this message. The title should capture the main topic or question being asked.
         
@@ -328,6 +347,8 @@ class LLM: ObservableObject {
         
         Title:
         """
+        
+        let session = getSessionForChat(chatSession.id)
         
         do {
             let responseStream = session.streamResponse(to: titlePrompt)
@@ -369,7 +390,7 @@ class LLM: ObservableObject {
         // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
             print("📚 RAG: Generating title for first message. Session ID: \(chatSession.id)")
-            let generatedTitle = await generateChatTitle(from: UIQuery)
+            let generatedTitle = await generateChatTitle(from: UIQuery, for: chatSession)
             print("📚 RAG: Generated title: '\(generatedTitle)'")
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
             print("📚 RAG: Title update completed")
@@ -396,6 +417,9 @@ class LLM: ObservableObject {
                     
                     Answer:
                     """
+        
+        let session = getSessionForChat(chatSession.id)
+        
         do {
             let responseStream = session.streamResponse(to: prompt)
             var fullResponse = ""
@@ -411,10 +435,12 @@ class LLM: ObservableObject {
             
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
-            session = newSession(previousSession: session)
+            let newSessionInstance = newSession(previousSession: session)
+            sessions[chatSession.id] = newSessionInstance
+            
             // Retry with new session
             do {
-                let responseStream = session.streamResponse(to: prompt)
+                let responseStream = newSessionInstance.streamResponse(to: prompt)
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
@@ -478,7 +504,7 @@ class LLM: ObservableObject {
         // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
             print("💬 General: Generating title for first message. Session ID: \(chatSession.id)")
-            let generatedTitle = await generateChatTitle(from: UIQuery)
+            let generatedTitle = await generateChatTitle(from: UIQuery, for: chatSession)
             print("💬 General: Generated title: '\(generatedTitle)'")
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
             print("💬 General: Title update completed")
@@ -498,6 +524,8 @@ class LLM: ObservableObject {
                     
                     Answer:
                     """
+        
+        let session = getSessionForChat(chatSession.id)
         print("--------------------\nMODEL TRANSCRIPT:\n ", session.transcript)
         
         do {
@@ -515,10 +543,12 @@ class LLM: ObservableObject {
             
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
-            session = newSession(previousSession: session)
+            let newSessionInstance = newSession(previousSession: session)
+            sessions[chatSession.id] = newSessionInstance
+            
             // Retry with new session
             do {
-                let responseStream = session.streamResponse(to: prompt)
+                let responseStream = newSessionInstance.streamResponse(to: prompt)
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
