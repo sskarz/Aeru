@@ -167,17 +167,19 @@ class LLM: ObservableObject {
         isWebSearching = true
         webSearchResults = []
         
-        // Check if this is the first message in the session and generate title if needed
+        // Check if this is the first message in the session
         let isFirstMessage = chatMessages.isEmpty
+        
+        // Save user message immediately so it displays right away
+        let userMessage = ChatMessage(text: UIQuery, isUser: true)
+        chatMessages.append(userMessage)
+        databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        
+        // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
             let generatedTitle = await generateChatTitle(from: UIQuery)
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
         }
-        
-        // Save user message
-        let userMessage = ChatMessage(text: UIQuery, isUser: true)
-        chatMessages.append(userMessage)
-        databaseManager.saveMessage(userMessage, sessionId: sessionId)
         
         // Perform web search and scraping
         let results = await webSearch.searchAndScrape(query: userLLMQuery)
@@ -333,17 +335,19 @@ class LLM: ObservableObject {
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using RAG
         
-        // Check if this is the first message in the session and generate title if needed
+        // Check if this is the first message in the session
         let isFirstMessage = chatMessages.isEmpty
+        
+        // Save user message immediately so it displays right away
+        let userMessage = ChatMessage(text: UIQuery, isUser: true)
+        chatMessages.append(userMessage)
+        databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        
+        // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
             let generatedTitle = await generateChatTitle(from: UIQuery)
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
         }
-        
-        // Save user message
-        let userMessage = ChatMessage(text: UIQuery, isUser: true)
-        chatMessages.append(userMessage)
-        databaseManager.saveMessage(userMessage, sessionId: sessionId)
         
         let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
         await rag.loadCollection()
@@ -437,17 +441,19 @@ class LLM: ObservableObject {
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using general mode
         
-        // Check if this is the first message in the session and generate title if needed
+        // Check if this is the first message in the session
         let isFirstMessage = chatMessages.isEmpty
+        
+        // Save user message immediately so it displays right away
+        let userMessage = ChatMessage(text: UIQuery, isUser: true)
+        chatMessages.append(userMessage)
+        databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        
+        // Generate title first if this is the first message
         if isFirstMessage && chatSession.title.isEmpty {
             let generatedTitle = await generateChatTitle(from: UIQuery)
             sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
         }
-        
-        // Save user message
-        let userMessage = ChatMessage(text: UIQuery, isUser: true)
-        chatMessages.append(userMessage)
-        databaseManager.saveMessage(userMessage, sessionId: sessionId)
         
         // Create a simple prompt without RAG context or web search results
         let prompt = """
