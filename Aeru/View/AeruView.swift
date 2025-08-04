@@ -131,6 +131,8 @@ struct AeruView: View {
         .sheet(isPresented: $showKnowledgeBase) {
             if let currentSession = sessionManager.currentSession {
                 KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry)
+                    .presentationDetents([.fraction(0.5)])
+                    .presentationDragIndicator(.visible)
             }
         }
         .sheet(item: $webBrowserURL) { browserURL in
@@ -535,8 +537,6 @@ struct KnowledgeBaseView: View {
                 
                 // Document Upload Section
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Upload Documents")
-                        .font(.headline)
                     
                     Button(action: { showDocumentPicker = true }) {
                         HStack {
@@ -562,7 +562,6 @@ struct KnowledgeBaseView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
                 .cornerRadius(12)
                 
                 // Uploaded Documents List
@@ -578,42 +577,32 @@ struct KnowledgeBaseView: View {
                                     .lineLimit(1)
                                 Text("Uploaded: \(document.uploadedAt, style: .date)")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
                             }
                         }
                         .frame(maxHeight: 150)
                     }
                 }
-                
-                if !llm.getRagNeighbors(for: session).isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Knowledge Base Entries")
-                            .font(.headline)
-                        
-                        List(llm.getRagNeighbors(for: session), id: \.0) { neighbor in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(neighbor.0)
-                                    .font(.body)
-                                Text("Similarity: \(String(format: "%.3f", neighbor.1))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                }
-                
+                // Knowledge based entries
+//                if !llm.getRagNeighbors(for: session).isEmpty {
+//                    VStack(alignment: .leading, spacing: 8) {
+//                        Text("Knowledge Base Entries")
+//                            .font(.headline)
+//                        
+//                        List(llm.getRagNeighbors(for: session), id: \.0) { neighbor in
+//                            VStack(alignment: .leading, spacing: 4) {
+//                                Text(neighbor.0)
+//                                    .font(.body)
+//                                Text("Similarity: \(String(format: "%.3f", neighbor.1))")
+//                                    .font(.caption)
+//                            }
+//                        }
+//                    }
+//                }
+//                
                 Spacer()
             }
             .padding()
-            .navigationTitle("Knowledge Base")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .onAppear {
                 loadDocuments()
             }
