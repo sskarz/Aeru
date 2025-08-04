@@ -24,6 +24,7 @@ class DatabaseManager {
     private let sessionCollectionName = Expression<String>("collection_name")
     private let sessionCreatedAt = Expression<Date>("created_at")
     private let sessionUpdatedAt = Expression<Date>("updated_at")
+    private let sessionUseWebSearch = Expression<Bool>("use_web_search")
     
     // Chat Messages columns
     private let messageId = Expression<String>("id")
@@ -72,7 +73,11 @@ class DatabaseManager {
                 t.column(sessionCollectionName)
                 t.column(sessionCreatedAt)
                 t.column(sessionUpdatedAt)
+                t.column(sessionUseWebSearch, defaultValue: false)
             })
+            
+            // Migration: Add use_web_search column if it doesn't exist
+            migrateAddWebSearchColumn()
             
             // Create chat messages table
             try db?.run(chatMessages.create(ifNotExists: true) { t in
@@ -110,9 +115,21 @@ class DatabaseManager {
         }
     }
     
+    private func migrateAddWebSearchColumn() {
+        do {
+            // Check if the column exists by attempting to add it
+            // If it fails, the column likely already exists
+            try db?.run("ALTER TABLE chat_sessions ADD COLUMN use_web_search BOOLEAN DEFAULT 0")
+            print("✅ Migration: Added use_web_search column to chat_sessions table")
+        } catch {
+            // Column likely already exists or other error - this is expected for existing databases
+            print("📋 Migration: use_web_search column migration skipped (likely already exists)")
+        }
+    }
+    
     // MARK: - Chat Sessions
     
-    func createChatSession(title: String) -> ChatSession? {
+    func createChatSession(title: String, useWebSearch: Bool = false) -> ChatSession? {
         let id = UUID().uuidString
         let collectionName = "chat_\(id)"
         let now = Date()
@@ -123,7 +140,8 @@ class DatabaseManager {
                 sessionTitle <- title,
                 sessionCollectionName <- collectionName,
                 sessionCreatedAt <- now,
-                sessionUpdatedAt <- now
+                sessionUpdatedAt <- now,
+                sessionUseWebSearch <- useWebSearch
             )
             try db?.run(insert)
             
@@ -132,7 +150,8 @@ class DatabaseManager {
                 title: title,
                 collectionName: collectionName,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
+                useWebSearch: useWebSearch
             )
         } catch {
             print("Create chat session error: \(error)")
@@ -149,7 +168,8 @@ class DatabaseManager {
                     title: row[sessionTitle],
                     collectionName: row[sessionCollectionName],
                     createdAt: row[sessionCreatedAt],
-                    updatedAt: row[sessionUpdatedAt]
+                    updatedAt: row[sessionUpdatedAt],
+                    useWebSearch: row[sessionUseWebSearch]
                 )
             } ?? []
         } catch {
@@ -163,10 +183,23 @@ class DatabaseManager {
             let sessionRow = chatSessions.filter(sessionId == session.id)
             try db?.run(sessionRow.update(
                 sessionTitle <- session.title,
-                sessionUpdatedAt <- Date()
+                sessionUpdatedAt <- Date(),
+                sessionUseWebSearch <- session.useWebSearch
             ))
         } catch {
             print("Update chat session error: \(error)")
+        }
+    }
+    
+    func updateChatSessionWebSearch(_ sessionId: String, useWebSearch: Bool) {
+        do {
+            let sessionRow = chatSessions.filter(self.sessionId == sessionId)
+            try db?.run(sessionRow.update(
+                sessionUseWebSearch <- useWebSearch,
+                sessionUpdatedAt <- Date()
+            ))
+        } catch {
+            print("Update chat session web search error: \(error)")
         }
     }
     

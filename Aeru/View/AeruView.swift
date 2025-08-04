@@ -25,12 +25,13 @@ struct AeruView: View {
     @StateObject private var networkConnectivity = NetworkConnectivity()
     
     @State private var messageText: String = ""
-    @State private var useWebSearch: Bool = false
+    // useWebSearch is now per-session, computed from currentSession
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
     @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
     @State private var showConnectivityAlert: Bool = false
+    @State private var showDuplicateChatAlert: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
     // Sidebar animation properties
@@ -43,6 +44,24 @@ struct AeruView: View {
 
     private var isModelResponding: Bool {
         llm.userLLMResponse != nil || llm.isWebSearching
+    }
+    
+    private var useWebSearch: Bool {
+        sessionManager.currentSession?.useWebSearch ?? false
+    }
+    
+    private func handleNewChatCreation() {
+        let result = sessionManager.createNewSession(title: "")
+        switch result {
+        case .success(_):
+            // Successfully created new chat
+            break
+        case .duplicateUntitled:
+            showDuplicateChatAlert = true
+        case .duplicateTitle, .databaseError:
+            // Handle other errors if needed
+            break
+        }
     }
     
     var body: some View {
@@ -130,7 +149,7 @@ struct AeruView: View {
         }
         .sheet(isPresented: $showKnowledgeBase) {
             if let currentSession = sessionManager.currentSession {
-                KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry, useWebSearch: $useWebSearch)
+                KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry, sessionManager: sessionManager)
                     .presentationDetents([.fraction(0.5)])
                     .presentationDragIndicator(.visible)
             }
@@ -168,7 +187,13 @@ struct AeruView: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                Spacer()
+                // New chat button
+                Button(action: handleNewChatCreation) {
+                    Image(systemName: "plus")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                        .frame(width: 24, height: 24)
+                }
                 
             }
             .padding(.horizontal, 16)
@@ -500,12 +525,16 @@ struct KnowledgeBaseView: View {
     let llm: LLM
     let session: ChatSession
     @Binding var newEntry: String
-    @Binding var useWebSearch: Bool
+    let sessionManager: ChatSessionManager
     @Environment(\.dismiss) private var dismiss
     
     @State private var showDocumentPicker = false
     @State private var isProcessingDocument = false
     @State private var documents: [(id: String, name: String, type: String, uploadedAt: Date)] = []
+    
+    private var useWebSearch: Bool {
+        session.useWebSearch
+    }
     
     var body: some View {
         NavigationView {
@@ -535,7 +564,7 @@ struct KnowledgeBaseView: View {
                 }
                 
                 Button(action: {
-                    useWebSearch.toggle()
+                    sessionManager.updateSessionWebSearch(session, useWebSearch: !useWebSearch)
                 }) {
                     HStack {
                         Image(systemName: "globe.americas.fill")

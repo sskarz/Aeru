@@ -14,6 +14,7 @@ struct ChatSession: Identifiable, Codable, Equatable {
     let collectionName: String
     let createdAt: Date
     var updatedAt: Date
+    var useWebSearch: Bool
     
     var displayTitle: String {
         title.isEmpty ? "New Chat" : title
@@ -25,6 +26,13 @@ struct ChatSession: Identifiable, Codable, Equatable {
         formatter.timeStyle = .short
         return formatter.string(from: updatedAt)
     }
+}
+
+enum SessionCreationResult {
+    case success(ChatSession)
+    case duplicateUntitled
+    case duplicateTitle
+    case databaseError
 }
 
 class ChatSessionManager: ObservableObject {
@@ -49,20 +57,36 @@ class ChatSessionManager: ObservableObject {
         }
     }
     
-    func createNewSession(title: String = "") -> ChatSession? {
-        // For empty titles, create session without duplicate check
+    func createNewSession(title: String = "") -> SessionCreationResult {
+        // For empty titles, check if a "New Chat" session already exists
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !normalizedTitle.isEmpty && titleExists(normalizedTitle) {
-            return nil
+        
+        if normalizedTitle.isEmpty {
+            // Check if there's already an empty-titled session (displays as "New Chat")
+            if sessions.contains(where: { $0.title.isEmpty }) {
+                return .duplicateUntitled
+            }
+        } else if titleExists(normalizedTitle) {
+            return .duplicateTitle
         }
         
-        guard let newSession = databaseManager.createChatSession(title: normalizedTitle) else {
-            return nil
+        guard let newSession = databaseManager.createChatSession(title: normalizedTitle, useWebSearch: false) else {
+            return .databaseError
         }
         
         sessions.insert(newSession, at: 0)
         currentSession = newSession
-        return newSession
+        return .success(newSession)
+    }
+    
+    // Convenience method for backward compatibility
+    func tryCreateNewSession(title: String = "") -> ChatSession? {
+        switch createNewSession(title: title) {
+        case .success(let session):
+            return session
+        default:
+            return nil
+        }
     }
     
     func titleExists(_ title: String) -> Bool {
@@ -142,6 +166,22 @@ class ChatSessionManager: ObservableObject {
         if currentSession?.id == session.id {
             currentSession = updatedSession
             print("✅ SessionManager: Updated currentSession with new title")
+        }
+    }
+    
+    func updateSessionWebSearch(_ session: ChatSession, useWebSearch: Bool) {
+        var updatedSession = session
+        updatedSession.useWebSearch = useWebSearch
+        updatedSession.updatedAt = Date()
+        
+        databaseManager.updateChatSessionWebSearch(session.id, useWebSearch: useWebSearch)
+        
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = updatedSession
+        }
+        
+        if currentSession?.id == session.id {
+            currentSession = updatedSession
         }
     }
     
