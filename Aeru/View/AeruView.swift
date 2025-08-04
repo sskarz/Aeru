@@ -277,9 +277,9 @@ struct AeruView: View {
                 // Document upload button
                 Button(action: { showKnowledgeBase.toggle() }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 40, height: 40)
                         .background(
                             Circle()
                                 .fill(Color(.systemGray6))
@@ -511,58 +511,57 @@ struct KnowledgeBaseView: View {
         NavigationView {
             VStack(spacing: 16) {
                 
-                // Document Upload Section
-                VStack(alignment: .leading, spacing: 8) {
-                    
-                    Button(action: { showDocumentPicker = true }) {
-                        HStack {
-                            Image(systemName: "doc.badge.plus")
-                            Text("Upload PDF Document")
+                // Document Upload and Web Search Section
+                VStack(alignment: .leading, spacing: 16) {
+                    // Document Upload
+                    VStack(alignment: .leading, spacing: 8) {
+                        
+                        Button(action: { showDocumentPicker = true }) {
+                            HStack {
+                                Image(systemName: "doc.badge.plus")
+                                Text("Upload PDF Document")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                    .disabled(isProcessingDocument)
-                    
-                    if isProcessingDocument {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Processing document...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .padding()
-                .cornerRadius(12)
-                
-                // Web Search Toggle Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Search Mode")
-                        .font(.headline)
-                    
-                    Button(action: {
-                        useWebSearch.toggle()
-                    }) {
-                        HStack {
-                            Image(systemName: "globe.americas.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(useWebSearch ? .white : .blue)
-                            Text("Web Search")
-                                .foregroundColor(useWebSearch ? .white : .blue)
-                            Spacer()
-                            if useWebSearch {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.white)
+                        .disabled(isProcessingDocument)
+                        
+                        if isProcessingDocument {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Processing document...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
-                        .padding()
-                        .background(useWebSearch ? Color.blue : Color.blue.opacity(0.1))
-                        .cornerRadius(8)
+                    }
+                    
+                    // Web Search Toggle
+                    VStack(alignment: .leading, spacing: 8) {
+                        
+                        Button(action: {
+                            useWebSearch.toggle()
+                        }) {
+                            HStack {
+                                Image(systemName: "globe.americas.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(useWebSearch ? .white : .blue)
+                                Text("Web Search")
+                                    .foregroundColor(useWebSearch ? .white : .blue)
+                                Spacer()
+                                if useWebSearch {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .padding()
+                            .background(useWebSearch ? Color.blue : Color.blue.opacity(0.1))
+                            .cornerRadius(8)
+                        }
                     }
                 }
                 .padding()
