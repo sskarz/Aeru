@@ -130,7 +130,7 @@ struct AeruView: View {
         }
         .sheet(isPresented: $showKnowledgeBase) {
             if let currentSession = sessionManager.currentSession {
-                KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry)
+                KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry, useWebSearch: $useWebSearch)
                     .presentationDetents([.fraction(0.5)])
                     .presentationDragIndicator(.visible)
             }
@@ -314,31 +314,6 @@ struct AeruView: View {
                 .glassEffect(.regular.interactive())
             }
             
-            // Mode selection icons
-            HStack(spacing: 24) {
-                
-                // Web Search Mode
-                Button(action: {
-                    useWebSearch.toggle()
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "globe.americas.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(useWebSearch ? .blue : .gray)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(useWebSearch ? Color.blue.opacity(0.1) : Color.clear)
-                            )
-                        Text("Web")
-                            .font(.caption2)
-                            .foregroundColor(useWebSearch ? .blue : .gray)
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -525,6 +500,7 @@ struct KnowledgeBaseView: View {
     let llm: LLM
     let session: ChatSession
     @Binding var newEntry: String
+    @Binding var useWebSearch: Bool
     @Environment(\.dismiss) private var dismiss
     
     @State private var showDocumentPicker = false
@@ -562,6 +538,35 @@ struct KnowledgeBaseView: View {
                     }
                 }
                 .padding()
+                .cornerRadius(12)
+                
+                // Web Search Toggle Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Search Mode")
+                        .font(.headline)
+                    
+                    Button(action: {
+                        useWebSearch.toggle()
+                    }) {
+                        HStack {
+                            Image(systemName: "globe.americas.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(useWebSearch ? .white : .blue)
+                            Text("Web Search")
+                                .foregroundColor(useWebSearch ? .white : .blue)
+                            Spacer()
+                            if useWebSearch {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .padding()
+                        .background(useWebSearch ? Color.blue : Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
                 .cornerRadius(12)
                 
                 // Uploaded Documents List
