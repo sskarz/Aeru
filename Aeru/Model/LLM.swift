@@ -210,15 +210,6 @@ class LLM: ObservableObject {
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
         
-        // Generate title first if this is the first message
-        if isFirstMessage && chatSession.title.isEmpty {
-            print("🔍 WebSearch: Generating title for first message. Session ID: \(chatSession.id)")
-            let generatedTitle = await generateChatTitle(from: UIQuery, for: chatSession)
-            print("🔍 WebSearch: Generated title: '\(generatedTitle)'")
-            sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
-            print("🔍 WebSearch: Title update completed")
-        }
-        
         // Perform web search and scraping
         let results = await webSearch.searchAndScrape(query: userLLMQuery)
         webSearchResults = results
@@ -278,6 +269,15 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             
+            // Generate title after successful response if this is the first message
+            if isFirstMessage && chatSession.title.isEmpty {
+                print("🔍 WebSearch: Generating title from AI response. Session ID: \(chatSession.id)")
+                let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                print("🔍 WebSearch: Generated title: '\(generatedTitle)'")
+                sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                print("🔍 WebSearch: Title update completed")
+            }
+            
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
             let newSessionInstance = newSession(previousSession: session)
@@ -296,6 +296,15 @@ class LLM: ObservableObject {
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Generate title after successful response if this is the first message
+                if isFirstMessage && chatSession.title.isEmpty {
+                    print("🔍 WebSearch: Generating title from AI response (retry). Session ID: \(chatSession.id)")
+                    let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                    print("🔍 WebSearch: Generated title: '\(generatedTitle)'")
+                    sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                    print("🔍 WebSearch: Title update completed")
+                }
                 
             } catch {
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
@@ -332,18 +341,18 @@ class LLM: ObservableObject {
         isWebSearching = false
     }
     
-    func generateChatTitle(from prompt: String, for chatSession: ChatSession) async -> String {
+    func generateChatTitle(from aiResponse: String, for chatSession: ChatSession) async -> String {
         let titlePrompt = """
-        Generate a short, descriptive title (3-4 words) for a chat conversation that starts with this message. The title should capture the main topic or question being asked.
+        Generate a short, descriptive title (2-4 words) for a chat conversation based on this AI response. The title should capture the main topic or subject matter.
         
-        Message: "\(prompt)"
+        AI Response: "\(aiResponse)"
         
         Instructions:
-        1. Keep it concise (3-6 words maximum)
-        2. Focus on the main topic or intent
+        1. Keep it concise (2-4 words maximum)
+        2. Focus on the main topic or subject matter
         3. Don't include quotation marks
         4. Make it suitable as a chat title
-        5. If it's a general greeting, use "General Chat"
+        5. Use simple, clear language
         
         Title:
         """
@@ -387,15 +396,6 @@ class LLM: ObservableObject {
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
         
-        // Generate title first if this is the first message
-        if isFirstMessage && chatSession.title.isEmpty {
-            print("📚 RAG: Generating title for first message. Session ID: \(chatSession.id)")
-            let generatedTitle = await generateChatTitle(from: UIQuery, for: chatSession)
-            print("📚 RAG: Generated title: '\(generatedTitle)'")
-            sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
-            print("📚 RAG: Title update completed")
-        }
-        
         let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
         await rag.loadCollection()
         await rag.findLLMNeighbors(for: userLLMQuery)
@@ -433,6 +433,15 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             
+            // Generate title after successful response if this is the first message
+            if isFirstMessage && chatSession.title.isEmpty {
+                print("📚 RAG: Generating title from AI response. Session ID: \(chatSession.id)")
+                let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                print("📚 RAG: Generated title: '\(generatedTitle)'")
+                sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                print("📚 RAG: Title update completed")
+            }
+            
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
             let newSessionInstance = newSession(previousSession: session)
@@ -451,6 +460,15 @@ class LLM: ObservableObject {
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Generate title after successful response if this is the first message
+                if isFirstMessage && chatSession.title.isEmpty {
+                    print("📚 RAG: Generating title from AI response (retry). Session ID: \(chatSession.id)")
+                    let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                    print("📚 RAG: Generated title: '\(generatedTitle)'")
+                    sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                    print("📚 RAG: Title update completed")
+                }
                 
             } catch {
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
@@ -501,15 +519,6 @@ class LLM: ObservableObject {
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
         
-        // Generate title first if this is the first message
-        if isFirstMessage && chatSession.title.isEmpty {
-            print("💬 General: Generating title for first message. Session ID: \(chatSession.id)")
-            let generatedTitle = await generateChatTitle(from: UIQuery, for: chatSession)
-            print("💬 General: Generated title: '\(generatedTitle)'")
-            sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
-            print("💬 General: Title update completed")
-        }
-        
         // Create a simple prompt without RAG context or web search results
         let prompt = """
                     You are a helpful assistant. Answer the following question based on your general knowledge and training.
@@ -541,6 +550,15 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             
+            // Generate title after successful response if this is the first message
+            if isFirstMessage && chatSession.title.isEmpty {
+                print("💬 General: Generating title from AI response. Session ID: \(chatSession.id)")
+                let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                print("💬 General: Generated title: '\(generatedTitle)'")
+                sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                print("💬 General: Title update completed")
+            }
+            
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
             let newSessionInstance = newSession(previousSession: session)
@@ -559,6 +577,15 @@ class LLM: ObservableObject {
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Generate title after successful response if this is the first message
+                if isFirstMessage && chatSession.title.isEmpty {
+                    print("💬 General: Generating title from AI response (retry). Session ID: \(chatSession.id)")
+                    let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                    print("💬 General: Generated title: '\(generatedTitle)'")
+                    sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                    print("💬 General: Title update completed")
+                }
                 
             } catch {
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
