@@ -49,10 +49,10 @@ class ChatSessionManager: ObservableObject {
         }
     }
     
-    func createNewSession(title: String = "New Chat") -> ChatSession? {
-        // Check for duplicate titles (case-insensitive)
+    func createNewSession(title: String = "") -> ChatSession? {
+        // For empty titles, create session without duplicate check
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if titleExists(normalizedTitle) {
+        if !normalizedTitle.isEmpty && titleExists(normalizedTitle) {
             return nil
         }
         
@@ -116,6 +116,25 @@ class ChatSessionManager: ObservableObject {
         }
         
         return true
+    }
+    
+    func updateSessionTitleIfEmpty(_ session: ChatSession, with newTitle: String) {
+        // Only update if the session currently has an empty title
+        guard session.title.isEmpty else { return }
+        
+        var updatedSession = session
+        updatedSession.title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        updatedSession.updatedAt = Date()
+        
+        databaseManager.updateChatSession(updatedSession)
+        
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = updatedSession
+        }
+        
+        if currentSession?.id == session.id {
+            currentSession = updatedSession
+        }
     }
     
     func selectSession(_ session: ChatSession) {

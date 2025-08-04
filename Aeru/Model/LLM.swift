@@ -159,13 +159,20 @@ class LLM: ObservableObject {
         return rag.neighbors
     }
     
-    func webSearch(_ UIQuery: String, for chatSession: ChatSession) async throws {
+    func webSearch(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
         userLLMResponse = ""
         userLLMQuery = UIQuery
         isWebSearching = true
         webSearchResults = []
+        
+        // Check if this is the first message in the session and generate title if needed
+        let isFirstMessage = chatMessages.isEmpty
+        if isFirstMessage && chatSession.title.isEmpty {
+            let generatedTitle = await generateChatTitle(from: UIQuery)
+            sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+        }
         
         // Save user message
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
@@ -281,12 +288,57 @@ class LLM: ObservableObject {
         isWebSearching = false
     }
     
-    func queryLLM(_ UIQuery: String, for chatSession: ChatSession) async throws {
+    func generateChatTitle(from prompt: String) async -> String {
+        let titlePrompt = """
+        Generate a short, descriptive title (3-4 words) for a chat conversation that starts with this message. The title should capture the main topic or question being asked.
+        
+        Message: "\(prompt)"
+        
+        Instructions:
+        1. Keep it concise (3-6 words maximum)
+        2. Focus on the main topic or intent
+        3. Don't include quotation marks
+        4. Make it suitable as a chat title
+        5. If it's a general greeting, use "General Chat"
+        
+        Title:
+        """
+        
+        do {
+            let responseStream = session.streamResponse(to: titlePrompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                fullResponse = partialStream.description
+            }
+            
+            let cleanTitle = fullResponse
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\"", with: "")
+                .replacingOccurrences(of: """
+                , with: "")
+                .replacingOccurrences(of:
+ """, with: "")
+            
+            return cleanTitle.isEmpty ? "New Chat" : cleanTitle
+        } catch {
+            print("Error generating title: \(error)")
+            return "New Chat"
+        }
+    }
+    
+    func queryLLM(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
         userLLMResponse = ""
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using RAG
+        
+        // Check if this is the first message in the session and generate title if needed
+        let isFirstMessage = chatMessages.isEmpty
+        if isFirstMessage && chatSession.title.isEmpty {
+            let generatedTitle = await generateChatTitle(from: UIQuery)
+            sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+        }
         
         // Save user message
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
@@ -378,12 +430,19 @@ class LLM: ObservableObject {
         userLLMResponse = nil
     }
     
-    func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession) async throws {
+    func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
         userLLMResponse = ""
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using general mode
+        
+        // Check if this is the first message in the session and generate title if needed
+        let isFirstMessage = chatMessages.isEmpty
+        if isFirstMessage && chatSession.title.isEmpty {
+            let generatedTitle = await generateChatTitle(from: UIQuery)
+            sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+        }
         
         // Save user message
         let userMessage = ChatMessage(text: UIQuery, isUser: true)

@@ -401,12 +401,12 @@ struct AeruView: View {
         Task {
             do {
                 if useWebSearch {
-                    try await llm.webSearch(trimmedMessage, for: currentSession)
+                    try await llm.webSearch(trimmedMessage, for: currentSession, sessionManager: sessionManager)
                 } else if useRAG {
-                    try await llm.queryLLM(trimmedMessage, for: currentSession)
+                    try await llm.queryLLM(trimmedMessage, for: currentSession, sessionManager: sessionManager)
                 } else {
                     // When both RAG and Web Search are off, use general query
-                    try await llm.queryLLMGeneral(trimmedMessage, for: currentSession)
+                    try await llm.queryLLMGeneral(trimmedMessage, for: currentSession, sessionManager: sessionManager)
                 }
             } catch {
                 print("Error processing message: \(error)")
