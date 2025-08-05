@@ -119,12 +119,15 @@ struct AeruView: View {
                     .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
             }
             .gesture(
-                DragGesture()
+                DragGesture(minimumDistance: 5, coordinateSpace: .local)
                     .updating($gestureOffset) { value, out, _ in
-                        if value.translation.width > 0 && showSidebar {
-                            out = value.translation.width * 0.1
+                        // Simplified logic for better iOS 26 compatibility
+                        if showSidebar {
+                            // When sidebar is open, only allow closing gesture
+                            out = max(value.translation.width, -sidebarWidth)
                         } else {
-                            out = min(value.translation.width, sidebarWidth)
+                            // When sidebar is closed, only allow opening gesture
+                            out = max(0, min(value.translation.width, sidebarWidth))
                         }
                     }
                     .onEnded(onDragEnd)
@@ -382,15 +385,25 @@ struct AeruView: View {
     
     private func onDragEnd(value: DragGesture.Value) {
         let translation = value.translation.width
-        if translation > 0 && translation > (sidebarWidth * 0.6) {
-            showSidebar = true
-        } else if -translation > (sidebarWidth / 2) {
-            showSidebar = false
-        } else {
-            if offset == 0 || !showSidebar {
-                return
+        let velocity = value.velocity.width
+        
+        // Use a lower threshold for iOS 26 compatibility
+        let threshold = sidebarWidth * 0.3
+        
+        if showSidebar {
+            // Sidebar is open - check if should close
+            if translation < -threshold || velocity < -500 {
+                showSidebar = false
+            } else {
+                showSidebar = true // Keep open
             }
-            showSidebar = true
+        } else {
+            // Sidebar is closed - check if should open
+            if translation > threshold || velocity > 500 {
+                showSidebar = true
+            } else {
+                showSidebar = false // Keep closed
+            }
         }
     }
     
