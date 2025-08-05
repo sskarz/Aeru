@@ -121,13 +121,15 @@ struct AeruView: View {
             .gesture(
                 DragGesture(minimumDistance: 5, coordinateSpace: .local)
                     .updating($gestureOffset) { value, out, _ in
-                        // Simplified logic for better iOS 26 compatibility
+                        let translation = value.translation.width
+                        
                         if showSidebar {
-                            // When sidebar is open, only allow closing gesture
-                            out = max(value.translation.width, -sidebarWidth)
+                            // When sidebar is open, allow closing gesture (drag right to left)
+                            out = max(translation, -sidebarWidth)
                         } else {
-                            // When sidebar is closed, only allow opening gesture
-                            out = max(0, min(value.translation.width, sidebarWidth))
+                            // When sidebar is closed, allow opening gesture (drag left to right)
+                            // Apply the translation directly but clamp it to sidebarWidth
+                            out = max(0, min(translation, sidebarWidth))
                         }
                     }
                     .onEnded(onDragEnd)
