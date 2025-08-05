@@ -206,29 +206,27 @@ class LLM: ObservableObject {
         return rag.neighbors
     }
     
-    /// Saves a transcript (array of Transcript.Entry) for a given session to the database.
+    /// Saves a transcript for a given session to the database.
     func saveTranscript(_ transcript: Transcript, sessionId: String) {
         do {
-            let existingSession = getSessionForChat(sessionId)
-            let jsonData = try JSONEncoder().encode(existingSession.transcript)
+            let jsonData = try JSONEncoder().encode(transcript)
             let jsonString = String(data: jsonData, encoding: .utf8)!
-            // Save JSON string in database (implement this in DatabaseManager)
             databaseManager.saveTranscriptJSON(jsonString, sessionId: sessionId)
         } catch {
             print("Failed to encode transcript: \(error)")
         }
     }
     
-    /// Loads a transcript (array of Transcript.Entry) for a given session from the database.
+    /// Loads a transcript for a given session from the database.
     func loadTranscript(for sessionId: String) -> Transcript? {
-        // Load JSON string from database (implement this in DatabaseManager)
         guard let jsonString = databaseManager.loadTranscriptJSON(for: sessionId),
+              !jsonString.isEmpty,
               let jsonData = jsonString.data(using: .utf8) else {
             return nil
         }
         do {
-            let entries = try JSONDecoder().decode(Transcript.self, from: jsonData)
-            return entries
+            let transcript = try JSONDecoder().decode(Transcript.self, from: jsonData)
+            return transcript
         } catch {
             print("Failed to decode transcript: \(error)")
             return nil
