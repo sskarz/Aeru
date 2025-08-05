@@ -26,7 +26,7 @@ class LLM: ObservableObject {
     
     // LLM Generation
     @Published var userLLMQuery: String = ""
-    @Published var userLLMResponse: String.PartiallyGenerated?
+    @Published var userLLMResponse: LanguageModelSession.ResponseStream<String>.Snapshot?
     
     // Web Search Services
     var webSearch: WebSearchService = WebSearchService()
@@ -236,7 +236,7 @@ class LLM: ObservableObject {
     func webSearch(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
-        userLLMResponse = ""
+        userLLMResponse = nil
         userLLMQuery = UIQuery
         isWebSearching = true
         webSearchResults = []
@@ -300,7 +300,7 @@ class LLM: ObservableObject {
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
-                fullResponse = partialStream.description
+                fullResponse = partialStream.content
             }
             
             // Clear streaming response first to prevent duplicate display
@@ -334,7 +334,7 @@ class LLM: ObservableObject {
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
-                    fullResponse = partialStream.description
+                    fullResponse = partialStream.content
                 }
                 
                 // Clear streaming response first to prevent duplicate display
@@ -412,7 +412,7 @@ class LLM: ObservableObject {
             let responseStream = session.streamResponse(to: titlePrompt)
             var fullResponse = ""
             for try await partialStream in responseStream {
-                fullResponse = partialStream.description
+                fullResponse = partialStream.content
             }
             
             let cleanTitle = fullResponse
@@ -433,7 +433,7 @@ class LLM: ObservableObject {
     func queryLLM(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
-        userLLMResponse = ""
+        userLLMResponse = nil
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using RAG
         
@@ -474,7 +474,7 @@ class LLM: ObservableObject {
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
-                fullResponse = partialStream.description
+                fullResponse = partialStream.content
             }
             
             // Clear streaming response first to prevent duplicate display
@@ -508,7 +508,7 @@ class LLM: ObservableObject {
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
-                    fullResponse = partialStream.description
+                    fullResponse = partialStream.content
                 }
                 
                 // Clear streaming response first to prevent duplicate display
@@ -565,7 +565,7 @@ class LLM: ObservableObject {
     func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
-        userLLMResponse = ""
+        userLLMResponse = nil
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using general mode
         
@@ -600,7 +600,7 @@ class LLM: ObservableObject {
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
-                fullResponse = partialStream.description
+                fullResponse = partialStream.content
             }
             
             // Clear streaming response first to prevent duplicate display
@@ -634,7 +634,7 @@ class LLM: ObservableObject {
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
-                    fullResponse = partialStream.description
+                    fullResponse = partialStream.content
                 }
                 
                 // Clear streaming response first to prevent duplicate display

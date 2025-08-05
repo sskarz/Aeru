@@ -121,11 +121,16 @@ class DatabaseManager {
     
     private func runMigrations() {
         do {
-            // Migration: Add transcript_entry_json column if it doesn't exist
+            // Migration: Add use_web_search column if it doesn't exist
             let pragma = try db?.prepare("PRAGMA table_info(chat_sessions)")
             let columns = pragma?.compactMap { row in
                 row[1] as? String
             } ?? []
+            
+            if !columns.contains("use_web_search") {
+                try db?.run("ALTER TABLE chat_sessions ADD COLUMN use_web_search BOOLEAN DEFAULT 0")
+                print("Migration: Added use_web_search column to chat_sessions table")
+            }
             
             if !columns.contains("transcript_entry_json") {
                 try db?.run("ALTER TABLE chat_sessions ADD COLUMN transcript_entry_json TEXT DEFAULT ''")

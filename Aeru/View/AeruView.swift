@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 import WebKit
 import UIKit
 import MarkdownUI
+import FoundationModels
 
 
 struct BrowserURL: Identifiable {
@@ -234,7 +235,7 @@ struct AeruView: View {
                     
                     // Streaming response display
                     if let streamingResponse = llm.userLLMResponse {
-                        ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false)) { url in
+                        ChatBubbleView(message: ChatMessage(text: streamingResponse.content, isUser: false)) { url in
                             webBrowserURL = BrowserURL(url: url)
                         }
                         .id("streaming")
@@ -263,7 +264,7 @@ struct AeruView: View {
                     }
                 }
             }
-            .onChange(of: llm.userLLMResponse) { oldValue, newValue in
+            .onReceive(llm.$userLLMResponse) { newValue in
                 if newValue != nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo("streaming", anchor: .bottom)
