@@ -129,7 +129,8 @@ struct AeruView: View {
                         
                         if showSidebar {
                             // When sidebar is open, allow closing gesture (drag right to left)
-                            out = max(translation, -sidebarWidth)
+                            // Clamp to prevent over-swiping beyond the open position
+                            out = max(min(translation, 0), -sidebarWidth)
                         } else {
                             // When sidebar is closed, allow opening gesture (drag left to right)
                             // Apply the translation directly but clamp it to sidebarWidth
