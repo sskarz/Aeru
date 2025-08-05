@@ -119,7 +119,7 @@ struct AeruView: View {
                     .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
             }
             .gesture(
-                DragGesture(minimumDistance: 5, coordinateSpace: .local)
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .updating($gestureOffset) { value, out, _ in
                         let translation = value.translation.width
                         
