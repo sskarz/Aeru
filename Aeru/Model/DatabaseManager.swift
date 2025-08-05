@@ -203,6 +203,31 @@ class DatabaseManager {
         }
     }
     
+    func saveTranscriptJSON(_ jsonString: String, sessionId: String) {
+        do {
+            let sessionRow = chatSessions.filter(self.sessionId == sessionId)
+            try db?.run(sessionRow.update(
+                transcriptEntryJSON <- jsonString,
+                sessionUpdatedAt <- Date()
+            ))
+        } catch {
+            print("Save transcript JSON error: \(error)")
+        }
+    }
+    
+    func loadTranscriptJSON(for sessionId: String) -> String? {
+        do {
+            let sessionRow = chatSessions.filter(self.sessionId == sessionId)
+            if let session = try db?.pluck(sessionRow) {
+                return session[transcriptEntryJSON]
+            }
+            return nil
+        } catch {
+            print("Load transcript JSON error: \(error)")
+            return nil
+        }
+    }
+    
     // MARK: - Chat Messages
     
     func saveMessage(_ message: ChatMessage, sessionId: String) {

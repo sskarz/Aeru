@@ -66,18 +66,24 @@ class LLM: ObservableObject {
     }
     
     // Get or create LanguageModelSession for current session
-    // CHANGE THIS METHOD TO get the appropriate session transcript from database and load into the session
     private func getSessionForChat(_ sessionId: String) -> LanguageModelSession {
         if let existingSession = sessions[sessionId] {
-            
             return existingSession
         }
         
-        // let sessionTranscript = Transcript(entries: transcript saved in database for this specific session {Transcript.Entry})
-        // let newSession = LanguageModelSession(transcript: sessionTranscript))
-        let newSession = LanguageModelSession()
-        sessions[sessionId] = newSession
-        return newSession
+        // Load transcript from database if it exists
+        if let savedTranscript = loadTranscript(for: sessionId) {
+            let newSession = LanguageModelSession(transcript: savedTranscript)
+            sessions[sessionId] = newSession
+            print("\nWE ARE LOADING THE TRANSCRIPT BABYYYYY")
+            return newSession
+        } else {
+            // Create new session if no saved transcript
+            let newSession = LanguageModelSession()
+            sessions[sessionId] = newSession
+            print("\nWE ARE NOTTTTTTTTTTTTT LOADING THE TRANSCRIPT BABYYYYY")
+            return newSession
+        }
     }
     
     func sessionHasDocuments(_ session: ChatSession) -> Bool {
@@ -221,8 +227,8 @@ class LLM: ObservableObject {
             return nil
         }
         do {
-            let entries = try JSONDecoder().decode([Transcript].self, from: jsonData)
-            return Transcript(entries: entries)
+            let entries = try JSONDecoder().decode(Transcript.self, from: jsonData)
+            return entries
         } catch {
             print("Failed to decode transcript: \(error)")
             return nil
@@ -307,6 +313,9 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             
+            // Save transcript after successful response
+            saveTranscript(session.transcript, sessionId: sessionId)
+            
             // Generate title after successful response if this is the first message
             if isFirstMessage && chatSession.title.isEmpty {
                 print("🔍 WebSearch: Generating title from AI response. Session ID: \(chatSession.id)")
@@ -337,6 +346,9 @@ class LLM: ObservableObject {
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Save transcript after successful retry response
+                saveTranscript(newSessionInstance.transcript, sessionId: sessionId)
                 
                 // Generate title after successful response if this is the first message
                 if isFirstMessage && chatSession.title.isEmpty {
@@ -475,6 +487,9 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             
+            // Save transcript after successful response
+            saveTranscript(session.transcript, sessionId: sessionId)
+            
             // Generate title after successful response if this is the first message
             if isFirstMessage && chatSession.title.isEmpty {
                 print("📚 RAG: Generating title from AI response. Session ID: \(chatSession.id)")
@@ -505,6 +520,9 @@ class LLM: ObservableObject {
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Save transcript after successful retry response
+                saveTranscript(newSessionInstance.transcript, sessionId: sessionId)
                 
                 // Generate title after successful response if this is the first message
                 if isFirstMessage && chatSession.title.isEmpty {
@@ -595,6 +613,9 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
 
+            // Save transcript after successful response
+            saveTranscript(session.transcript, sessionId: sessionId)
+
             // Generate title after successful response if this is the first message
             if isFirstMessage && chatSession.title.isEmpty {
                 print("💬 General: Generating title from AI response. Session ID: \(chatSession.id)")
@@ -625,6 +646,9 @@ class LLM: ObservableObject {
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Save transcript after successful retry response
+                saveTranscript(newSessionInstance.transcript, sessionId: sessionId)
                 
                 // Generate title after successful response if this is the first message
                 if isFirstMessage && chatSession.title.isEmpty {
