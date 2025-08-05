@@ -132,7 +132,7 @@ struct AeruView: View {
                             out = max(0, min(translation, sidebarWidth))
                         }
                     }
-                    .onEnded(onDragEnd)
+                    .onChanged(onDragEnd)
             )
             .onChange(of: showSidebar) { _, newValue in
                 withAnimation {
