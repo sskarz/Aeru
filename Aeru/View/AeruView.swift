@@ -118,10 +118,14 @@ struct AeruView: View {
                     .offset(x: max(offset + gestureOffset, 0))
                     .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
             }
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20, coordinateSpace: .local)
                     .updating($gestureOffset) { value, out, _ in
                         let translation = value.translation.width
+                        let translationHeight = value.translation.height
+                        
+                        // Only activate for predominantly horizontal gestures
+                        guard abs(translation) > abs(translationHeight) * 1.5 else { return }
                         
                         if showSidebar {
                             // When sidebar is open, allow closing gesture (drag right to left)
@@ -387,7 +391,11 @@ struct AeruView: View {
     
     private func onDragEnd(value: DragGesture.Value) {
         let translation = value.translation.width
+        let translationHeight = value.translation.height
         let velocity = value.velocity.width
+        
+        // Only process predominantly horizontal gestures
+        guard abs(translation) > abs(translationHeight) * 1.5 else { return }
         
         // Use a lower threshold for iOS 26 compatibility
         let threshold = sidebarWidth * 0.3
