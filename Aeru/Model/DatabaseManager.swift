@@ -25,6 +25,9 @@ class DatabaseManager {
     private let sessionCreatedAt = Expression<Date>("created_at")
     private let sessionUpdatedAt = Expression<Date>("updated_at")
     private let sessionUseWebSearch = Expression<Bool>("use_web_search")
+    private let transcriptEntryJSON = Expression<String>("transcript_entry_json")
+    // Create a column for sessionTranscript
+    // private let sessionTranscript = Expression<Transcript.Entry>(
     
     // Chat Messages columns
     private let messageId = Expression<String>("id")
@@ -74,10 +77,9 @@ class DatabaseManager {
                 t.column(sessionCreatedAt)
                 t.column(sessionUpdatedAt)
                 t.column(sessionUseWebSearch, defaultValue: false)
+                t.column(transcriptEntryJSON)
             })
             
-            // Migration: Add use_web_search column if it doesn't exist
-            migrateAddWebSearchColumn()
             
             // Create chat messages table
             try db?.run(chatMessages.create(ifNotExists: true) { t in
@@ -115,17 +117,6 @@ class DatabaseManager {
         }
     }
     
-    private func migrateAddWebSearchColumn() {
-        do {
-            // Check if the column exists by attempting to add it
-            // If it fails, the column likely already exists
-            try db?.run("ALTER TABLE chat_sessions ADD COLUMN use_web_search BOOLEAN DEFAULT 0")
-            print("✅ Migration: Added use_web_search column to chat_sessions table")
-        } catch {
-            // Column likely already exists or other error - this is expected for existing databases
-            print("📋 Migration: use_web_search column migration skipped (likely already exists)")
-        }
-    }
     
     // MARK: - Chat Sessions
     

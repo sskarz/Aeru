@@ -38,10 +38,12 @@ class LLM: ObservableObject {
     private var currentSessionId: String?
     private let databaseManager = DatabaseManager.shared
     
+    private let encoder = JSONEncoder()
+    
     private func newSession(previousSession: LanguageModelSession) -> LanguageModelSession {
         let allEntries = previousSession.transcript
         var condensedEntries = [Transcript.Entry]()
-        print("\nCONDENSED ENTRIES: ", condensedEntries)
+
         if let firstEntry = allEntries.first {
             condensedEntries.append(firstEntry)
             if allEntries.count > 1, let lastEntry = allEntries.last {
@@ -64,11 +66,15 @@ class LLM: ObservableObject {
     }
     
     // Get or create LanguageModelSession for current session
+    // CHANGE THIS METHOD TO get the appropriate session transcript from database and load into the session
     private func getSessionForChat(_ sessionId: String) -> LanguageModelSession {
         if let existingSession = sessions[sessionId] {
+            
             return existingSession
         }
         
+        // let sessionTranscript = Transcript(entries: transcript saved in database for this specific session {Transcript.Entry})
+        // let newSession = LanguageModelSession(transcript: sessionTranscript))
         let newSession = LanguageModelSession()
         sessions[sessionId] = newSession
         return newSession
@@ -192,6 +198,35 @@ class LLM: ObservableObject {
     func getRagNeighbors(for session: ChatSession) -> [(String, Double)] {
         let rag = getRagForSession(session.id, collectionName: session.collectionName)
         return rag.neighbors
+    }
+    
+    /// Saves a transcript (array of Transcript.Entry) for a given session to the database.
+    func saveTranscript(_ transcript: Transcript, sessionId: String) {
+        do {
+            let existingSession = getSessionForChat(sessionId)
+            let jsonData = try JSONEncoder().encode(existingSession.transcript)
+            let jsonString = String(data: jsonData, encoding: .utf8)!
+            // Save JSON string in database (implement this in DatabaseManager)
+            databaseManager.saveTranscriptJSON(jsonString, sessionId: sessionId)
+        } catch {
+            print("Failed to encode transcript: \(error)")
+        }
+    }
+    
+    /// Loads a transcript (array of Transcript.Entry) for a given session from the database.
+    func loadTranscript(for sessionId: String) -> Transcript? {
+        // Load JSON string from database (implement this in DatabaseManager)
+        guard let jsonString = databaseManager.loadTranscriptJSON(for: sessionId),
+              let jsonData = jsonString.data(using: .utf8) else {
+            return nil
+        }
+        do {
+            let entries = try JSONDecoder().decode([Transcript].self, from: jsonData)
+            return Transcript(entries: entries)
+        } catch {
+            print("Failed to decode transcript: \(error)")
+            return nil
+        }
     }
     
     func webSearch(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
@@ -559,7 +594,7 @@ class LLM: ObservableObject {
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
-            
+
             // Generate title after successful response if this is the first message
             if isFirstMessage && chatSession.title.isEmpty {
                 print("💬 General: Generating title from AI response. Session ID: \(chatSession.id)")
