@@ -77,9 +77,11 @@ class DatabaseManager {
                 t.column(sessionCreatedAt)
                 t.column(sessionUpdatedAt)
                 t.column(sessionUseWebSearch, defaultValue: false)
-                t.column(transcriptEntryJSON)
+                t.column(transcriptEntryJSON, defaultValue: "")
             })
             
+            // Run migrations for existing tables
+            runMigrations()
             
             // Create chat messages table
             try db?.run(chatMessages.create(ifNotExists: true) { t in
@@ -114,6 +116,23 @@ class DatabaseManager {
             })
         } catch {
             print("Create tables error: \(error)")
+        }
+    }
+    
+    private func runMigrations() {
+        do {
+            // Migration: Add transcript_entry_json column if it doesn't exist
+            let pragma = try db?.prepare("PRAGMA table_info(chat_sessions)")
+            let columns = pragma?.compactMap { row in
+                row[1] as? String
+            } ?? []
+            
+            if !columns.contains("transcript_entry_json") {
+                try db?.run("ALTER TABLE chat_sessions ADD COLUMN transcript_entry_json TEXT DEFAULT ''")
+                print("Migration: Added transcript_entry_json column to chat_sessions table")
+            }
+        } catch {
+            print("Migration error: \(error)")
         }
     }
     
