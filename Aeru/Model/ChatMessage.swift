@@ -1,3 +1,10 @@
+//
+//  ChatMessage.swift
+//  Aeru
+//
+//  Created by Sanskar
+//
+
 import Foundation
 
 struct ChatMessage: Identifiable {

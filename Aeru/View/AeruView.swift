@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 import WebKit
 import UIKit
 import MarkdownUI
+import FoundationModels
 
 
 struct BrowserURL: Identifiable {
@@ -22,14 +23,15 @@ struct BrowserURL: Identifiable {
 struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
+    @StateObject private var networkConnectivity = NetworkConnectivity()
     
     @State private var messageText: String = ""
-    @State private var useRAG: Bool = false
-    @State private var useWebSearch: Bool = false
+    // useWebSearch is now per-session, computed from currentSession
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
     @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
+    @State private var showConnectivityAlert: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
     // Sidebar animation properties
@@ -42,6 +44,35 @@ struct AeruView: View {
 
     private var isModelResponding: Bool {
         llm.userLLMResponse != nil || llm.isWebSearching
+    }
+    
+    private var shouldDisableNewChatButton: Bool {
+        // Enable if no sessions exist (user needs a way to create first chat)
+        guard !sessionManager.sessions.isEmpty else { return false }
+        
+        // Disable if current chat is empty (new chat with 0 messages) or model is responding
+        return llm.chatMessages.isEmpty || isModelResponding
+    }
+    
+    private var useWebSearch: Bool {
+        sessionManager.currentSession?.useWebSearch ?? false
+    }
+    
+    private func handleNewChatCreation() {
+        let result = sessionManager.createNewSession(title: "")
+        switch result {
+        case .success(_):
+            // Successfully created new chat
+            break
+        case .duplicateUntitled:
+            // Redirect to existing new chat instead of showing alert
+            if let existingNewChat = sessionManager.sessions.first(where: { $0.title.isEmpty }) {
+                sessionManager.selectSession(existingNewChat)
+            }
+        case .duplicateTitle, .databaseError:
+            // Handle other errors if needed
+            break
+        }
     }
     
     var body: some View {
@@ -81,19 +112,29 @@ struct AeruView: View {
                 )
                 
                 // Sidebar
-                ChatSidebar(sessionManager: sessionManager)
+                ChatSidebar(sessionManager: sessionManager, shouldDisableNewChatButton: shouldDisableNewChatButton)
                     .frame(width: sidebarWidth)
                     .offset(x: -sidebarWidth)
                     .offset(x: max(offset + gestureOffset, 0))
                     .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
             }
-            .gesture(
-                DragGesture()
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20, coordinateSpace: .local)
                     .updating($gestureOffset) { value, out, _ in
-                        if value.translation.width > 0 && showSidebar {
-                            out = value.translation.width * 0.1
+                        let translation = value.translation.width
+                        let translationHeight = value.translation.height
+                        
+                        // Only activate for predominantly horizontal gestures
+                        guard abs(translation) > abs(translationHeight) * 1.5 else { return }
+                        
+                        if showSidebar {
+                            // When sidebar is open, allow closing gesture (drag right to left)
+                            // Clamp to prevent over-swiping beyond the open position
+                            out = max(min(translation, 0), -sidebarWidth)
                         } else {
-                            out = min(value.translation.width, sidebarWidth)
+                            // When sidebar is closed, allow opening gesture (drag left to right)
+                            // Apply the translation directly but clamp it to sidebarWidth
+                            out = max(0, min(translation, sidebarWidth))
                         }
                     }
                     .onEnded(onDragEnd)
@@ -129,11 +170,18 @@ struct AeruView: View {
         }
         .sheet(isPresented: $showKnowledgeBase) {
             if let currentSession = sessionManager.currentSession {
-                KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry)
+                KnowledgeBaseView(llm: llm, session: currentSession, newEntry: $newEntry, sessionManager: sessionManager)
+                    .presentationDetents([.fraction(0.5)])
+                    .presentationDragIndicator(.visible)
             }
         }
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
+        }
+        .alert("No Internet Connection", isPresented: $showConnectivityAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Please turn on cellular or WiFi to use web search functionality.")
         }
     }
     
@@ -152,7 +200,7 @@ struct AeruView: View {
                 }
                 
                 VStack(alignment: .center, spacing: 2) {
-                    Text(sessionManager.currentSession?.displayTitle ?? "RAG Chat Assistant")
+                    Text(sessionManager.currentSession?.displayTitle ?? "Aeru")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .lineLimit(1)
@@ -160,7 +208,14 @@ struct AeruView: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                Spacer()
+                // New chat button
+                Button(action: handleNewChatCreation) {
+                    Image(systemName: "plus.message")
+                        .font(.title3)
+                        .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
+                        .frame(width: 24, height: 24)
+                }
+                .disabled(shouldDisableNewChatButton)
                 
             }
             .padding(.horizontal, 16)
@@ -190,7 +245,7 @@ struct AeruView: View {
                     
                     // Streaming response display
                     if let streamingResponse = llm.userLLMResponse {
-                        ChatBubbleView(message: ChatMessage(text: streamingResponse.description, isUser: false)) { url in
+                        ChatBubbleView(message: ChatMessage(text: streamingResponse.content, isUser: false)) { url in
                             webBrowserURL = BrowserURL(url: url)
                         }
                         .id("streaming")
@@ -219,7 +274,7 @@ struct AeruView: View {
                     }
                 }
             }
-            .onChange(of: llm.userLLMResponse) { oldValue, newValue in
+            .onReceive(llm.$userLLMResponse) { newValue in
                 if newValue != nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo("streaming", anchor: .bottom)
@@ -269,9 +324,9 @@ struct AeruView: View {
                 // Document upload button
                 Button(action: { showKnowledgeBase.toggle() }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 40, height: 40)
                         .background(
                             Circle()
                                 .fill(Color(.systemGray6))
@@ -306,71 +361,6 @@ struct AeruView: View {
                 .glassEffect(.regular.interactive())
             }
             
-            // Mode selection icons
-            HStack(spacing: 24) {
-                // General Mode
-                Button(action: {
-                    useRAG = false
-                    useWebSearch = false
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 20))
-                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill((!useRAG && !useWebSearch) ? Color.blue.opacity(0.1) : Color.clear)
-                            )
-                        Text("General")
-                            .font(.caption2)
-                            .foregroundColor((!useRAG && !useWebSearch) ? .blue : .gray)
-                    }
-                }
-                
-                // RAG Mode
-                Button(action: {
-                    useRAG = true
-                    useWebSearch = false
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "books.vertical.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(useRAG ? .green : .gray)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(useRAG ? Color.green.opacity(0.1) : Color.clear)
-                            )
-                        Text("Docs")
-                            .font(.caption2)
-                            .foregroundColor(useRAG ? .green : .gray)
-                    }
-                }
-                
-                // Web Search Mode
-                Button(action: {
-                    useRAG = false
-                    useWebSearch = true
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "globe.americas.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(useWebSearch ? .blue : .gray)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(useWebSearch ? Color.blue.opacity(0.1) : Color.clear)
-                            )
-                        Text("Web")
-                            .font(.caption2)
-                            .foregroundColor(useWebSearch ? .blue : .gray)
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -381,20 +371,19 @@ struct AeruView: View {
         let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedMessage.isEmpty, let currentSession = sessionManager.currentSession else { return }
         
+        // Check connectivity for web search
+        if useWebSearch && !NetworkConnectivity.hasActiveConnection() {
+            showConnectivityAlert = true
+            return
+        }
+        
         // Clear input
         messageText = ""
         
-        // Send to appropriate service
+        // Send to appropriate service using intelligent routing
         Task {
             do {
-                if useWebSearch {
-                    try await llm.webSearch(trimmedMessage, for: currentSession)
-                } else if useRAG {
-                    try await llm.queryLLM(trimmedMessage, for: currentSession)
-                } else {
-                    // When both RAG and Web Search are off, use general query
-                    try await llm.queryLLMGeneral(trimmedMessage, for: currentSession)
-                }
+                try await llm.queryIntelligently(trimmedMessage, for: currentSession, sessionManager: sessionManager, useWebSearch: useWebSearch)
             } catch {
                 print("Error processing message: \(error)")
             }
@@ -403,15 +392,29 @@ struct AeruView: View {
     
     private func onDragEnd(value: DragGesture.Value) {
         let translation = value.translation.width
-        if translation > 0 && translation > (sidebarWidth * 0.6) {
-            showSidebar = true
-        } else if -translation > (sidebarWidth / 2) {
-            showSidebar = false
-        } else {
-            if offset == 0 || !showSidebar {
-                return
+        let translationHeight = value.translation.height
+        let velocity = value.velocity.width
+        
+        // Only process predominantly horizontal gestures
+        guard abs(translation) > abs(translationHeight) * 1.5 else { return }
+        
+        // Use a lower threshold for iOS 26 compatibility
+        let threshold = sidebarWidth * 0.3
+        
+        if showSidebar {
+            // Sidebar is open - check if should close
+            if translation < -threshold || velocity < -500 {
+                showSidebar = false
+            } else {
+                showSidebar = true // Keep open
             }
-            showSidebar = true
+        } else {
+            // Sidebar is closed - check if should open
+            if translation > threshold || velocity > 500 {
+                showSidebar = true
+            } else {
+                showSidebar = false // Keep closed
+            }
         }
     }
     
@@ -558,97 +561,98 @@ struct KnowledgeBaseView: View {
     let llm: LLM
     let session: ChatSession
     @Binding var newEntry: String
+    let sessionManager: ChatSessionManager
     @Environment(\.dismiss) private var dismiss
     
     @State private var showDocumentPicker = false
     @State private var isProcessingDocument = false
     @State private var documents: [(id: String, name: String, type: String, uploadedAt: Date)] = []
     
+    private var useWebSearch: Bool {
+        session.useWebSearch
+    }
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
                 
-                // Document Upload Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Upload Documents")
-                        .font(.headline)
-                    
-                    Button(action: { showDocumentPicker = true }) {
-                        HStack {
-                            Image(systemName: "doc.badge.plus")
-                            Text("Upload PDF Document")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
+                Button(action: { showDocumentPicker = true }) {
+                    HStack {
+                        Image(systemName: "doc.badge.plus")
+                        Text("Upload PDF Document")
                     }
-                    .disabled(isProcessingDocument)
-                    
-                    if isProcessingDocument {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Processing document...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+                .disabled(isProcessingDocument)
+                
+                if isProcessingDocument {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Processing document...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
                 
-                // Uploaded Documents List
+                Button(action: {
+                    sessionManager.updateSessionWebSearch(session, useWebSearch: !useWebSearch)
+                }) {
+                    HStack {
+                        Image(systemName: "globe.americas.fill")
+                        Text(useWebSearch ? "Web Search Enabled" : "Enable Web Search")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(useWebSearch ? Color.blue : Color.blue.opacity(0.1))
+                    .foregroundColor(useWebSearch ? .white : .blue)
+                    .cornerRadius(8)
+                }
+                
+                // Uploaded Documents
                 if !documents.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Uploaded Documents")
-                            .font(.headline)
-                        
-                        List(documents, id: \.id) { document in
-                            VStack(alignment: .leading, spacing: 2) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
+                        ForEach(documents, id: \.id) { document in
+                            VStack(spacing: 4) {
+                                Image(systemName: "doc.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.red)
                                 Text(document.name)
-                                    .font(.body)
-                                    .lineLimit(1)
-                                Text("Uploaded: \(document.uploadedAt, style: .date)")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
                             }
-                        }
-                        .frame(maxHeight: 150)
-                    }
-                }
-                
-                if !llm.getRagNeighbors(for: session).isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Knowledge Base Entries")
-                            .font(.headline)
-                        
-                        List(llm.getRagNeighbors(for: session), id: \.0) { neighbor in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(neighbor.0)
-                                    .font(.body)
-                                Text("Similarity: \(String(format: "%.3f", neighbor.1))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            .frame(width: 120, height: 80)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
                         }
                     }
                 }
-                
+                // Knowledge based entries
+//                if !llm.getRagNeighbors(for: session).isEmpty {
+//                    VStack(alignment: .leading, spacing: 8) {
+//                        Text("Knowledge Base Entries")
+//                            .font(.headline)
+//                        
+//                        List(llm.getRagNeighbors(for: session), id: \.0) { neighbor in
+//                            VStack(alignment: .leading, spacing: 4) {
+//                                Text(neighbor.0)
+//                                    .font(.body)
+//                                Text("Similarity: \(String(format: "%.3f", neighbor.1))")
+//                                    .font(.caption)
+//                            }
+//                        }
+//                    }
+//                }
+//                
                 Spacer()
             }
             .padding()
-            .navigationTitle("Knowledge Base")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .onAppear {
                 loadDocuments()
             }

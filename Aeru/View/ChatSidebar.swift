@@ -1,11 +1,17 @@
+//
+//  ChatSidebar.swift
+//  Aeru
+//
+//  Created by Sanskar
+//
+
 import SwiftUI
 import Foundation
 
 
 struct ChatSidebar: View {
     @ObservedObject var sessionManager: ChatSessionManager
-    @State private var showingNewChatAlert = false
-    @State private var newChatTitle = ""
+    let shouldDisableNewChatButton: Bool
     @State private var editingSession: ChatSession?
     @State private var editTitle = ""
     @State private var showingDuplicateTitleAlert = false
@@ -49,12 +55,15 @@ struct ChatSidebar: View {
                         
                         Spacer()
                         
-                        Button(action: { showingNewChatAlert = true }) {
-                            Image(systemName: "plus")
+                        Button(action: { 
+                            _ = sessionManager.createNewSession(title: "")
+                        }) {
+                            Image(systemName: "plus.message")
                                 .font(.title3)
-                                .foregroundColor(.blue)
+                                .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
                                 .frame(width: 24, height: 24)
                         }
+                        .disabled(shouldDisableNewChatButton)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -133,26 +142,6 @@ struct ChatSidebar: View {
             }
         }
         .background(Color(.systemBackground))
-        .alert("New Chat", isPresented: $showingNewChatAlert) {
-            TextField("Chat title", text: $newChatTitle)
-            Button("Create") {
-                if !newChatTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if sessionManager.createNewSession(title: newChatTitle) != nil {
-                        newChatTitle = ""
-                    } else {
-                        showingDuplicateTitleAlert = true
-                    }
-                } else {
-                    _ = sessionManager.createNewSession()
-                    newChatTitle = ""
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                newChatTitle = ""
-            }
-        } message: {
-            Text("Enter a title for your new chat session")
-        }
         .alert("Edit Chat Title", isPresented: Binding<Bool>(
             get: { editingSession != nil },
             set: { _ in editingSession = nil }

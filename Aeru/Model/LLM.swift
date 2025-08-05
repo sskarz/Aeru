@@ -21,9 +21,12 @@ class LLM: ObservableObject {
     // RAG - now managed per chat session
     private var ragModels: [String: RAGModel] = [:]
     
+    // LLM Sessions - now managed per chat session
+    private var sessions: [String: LanguageModelSession] = [:]
+    
     // LLM Generation
     @Published var userLLMQuery: String = ""
-    @Published var userLLMResponse: String.PartiallyGenerated?
+    @Published var userLLMResponse: LanguageModelSession.ResponseStream<String>.Snapshot?
     
     // Web Search Services
     var webSearch: WebSearchService = WebSearchService()
@@ -35,12 +38,12 @@ class LLM: ObservableObject {
     private var currentSessionId: String?
     private let databaseManager = DatabaseManager.shared
     
-    private lazy var session: LanguageModelSession = LanguageModelSession()
+    private let encoder = JSONEncoder()
     
     private func newSession(previousSession: LanguageModelSession) -> LanguageModelSession {
         let allEntries = previousSession.transcript
         var condensedEntries = [Transcript.Entry]()
-        print("\nCONDENSED ENTRIES: ", condensedEntries)
+
         if let firstEntry = allEntries.first {
             condensedEntries.append(firstEntry)
             if allEntries.count > 1, let lastEntry = allEntries.last {
@@ -62,9 +65,53 @@ class LLM: ObservableObject {
         return newRAG
     }
     
+    // Get or create LanguageModelSession for current session
+    private func getSessionForChat(_ sessionId: String) -> LanguageModelSession {
+        if let existingSession = sessions[sessionId] {
+            return existingSession
+        }
+        
+        // Load transcript from database if it exists
+        if let savedTranscript = loadTranscript(for: sessionId) {
+            let newSession = LanguageModelSession(transcript: savedTranscript)
+            sessions[sessionId] = newSession
+            print("\nWE ARE LOADING THE TRANSCRIPT BABYYYYY")
+            return newSession
+        } else {
+            // Create new session if no saved transcript
+            let newSession = LanguageModelSession()
+            sessions[sessionId] = newSession
+            print("\nWE ARE NOTTTTTTTTTTTTT LOADING THE TRANSCRIPT BABYYYYY")
+            return newSession
+        }
+    }
+    
+    func sessionHasDocuments(_ session: ChatSession) -> Bool {
+        let documents = databaseManager.getDocuments(for: session.id)
+        return !documents.isEmpty
+    }
+    
+    func queryIntelligently(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager, useWebSearch: Bool) async throws {
+        // Intelligent routing logic:
+        // 1. If web search is toggled, use web search
+        // 2. If session has 1 or more documents, use RAG
+        // 3. Else use general query
+        
+        if useWebSearch {
+            try await webSearch(UIQuery, for: chatSession, sessionManager: sessionManager)
+        } else if sessionHasDocuments(chatSession) {
+            try await queryLLM(UIQuery, for: chatSession, sessionManager: sessionManager)
+        } else {
+            try await queryLLMGeneral(UIQuery, for: chatSession, sessionManager: sessionManager)
+        }
+    }
+    
     func switchToSession(_ session: ChatSession) {
         currentSessionId = session.id
         loadMessagesForCurrentSession()
+        
+        // Ensure session-specific LanguageModelSession exists
+        _ = getSessionForChat(session.id)
     }
     
     func loadMessagesForCurrentSession() {
@@ -159,15 +206,45 @@ class LLM: ObservableObject {
         return rag.neighbors
     }
     
-    func webSearch(_ UIQuery: String, for chatSession: ChatSession) async throws {
+    /// Saves a transcript for a given session to the database.
+    func saveTranscript(_ transcript: Transcript, sessionId: String) {
+        do {
+            let jsonData = try JSONEncoder().encode(transcript)
+            let jsonString = String(data: jsonData, encoding: .utf8)!
+            databaseManager.saveTranscriptJSON(jsonString, sessionId: sessionId)
+        } catch {
+            print("Failed to encode transcript: \(error)")
+        }
+    }
+    
+    /// Loads a transcript for a given session from the database.
+    func loadTranscript(for sessionId: String) -> Transcript? {
+        guard let jsonString = databaseManager.loadTranscriptJSON(for: sessionId),
+              !jsonString.isEmpty,
+              let jsonData = jsonString.data(using: .utf8) else {
+            return nil
+        }
+        do {
+            let transcript = try JSONDecoder().decode(Transcript.self, from: jsonData)
+            return transcript
+        } catch {
+            print("Failed to decode transcript: \(error)")
+            return nil
+        }
+    }
+    
+    func webSearch(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
-        userLLMResponse = ""
+        userLLMResponse = nil
         userLLMQuery = UIQuery
         isWebSearching = true
         webSearchResults = []
         
-        // Save user message
+        // Check if this is the first message in the session
+        let isFirstMessage = chatMessages.isEmpty
+        
+        // Save user message immediately so it displays right away
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
@@ -180,11 +257,15 @@ class LLM: ObservableObject {
         let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
         await rag.loadCollection()
         
-        // Embed all scraped content into RAG
-        for result in results {
-            let chunks = webSearch.chunkText(result.content)
-            for chunk in chunks {
-                await rag.addEntry(chunk)
+        // Embed all scraped content into RAG - process chunks concurrently for better performance
+        await withTaskGroup(of: Void.self) { group in
+            for result in results {
+                let chunks = webSearch.chunkText(result.content)
+                for chunk in chunks {
+                    group.addTask {
+                        await rag.addEntry(chunk)
+                    }
+                }
             }
         }
         
@@ -216,35 +297,69 @@ class LLM: ObservableObject {
                     """
         
         // Generate response using LLM
+        let session = getSessionForChat(chatSession.id)
+        
         do {
             let responseStream = session.streamResponse(to: prompt)
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
-                fullResponse = partialStream.description
+                fullResponse = partialStream.content
             }
+            
+            // Clear streaming response first to prevent duplicate display
+            userLLMResponse = nil
             
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             
+            // Save transcript after successful response
+            saveTranscript(session.transcript, sessionId: sessionId)
+            
+            // Generate title after successful response if this is the first message
+            if isFirstMessage && chatSession.title.isEmpty {
+                print("🔍 WebSearch: Generating title from AI response. Session ID: \(chatSession.id)")
+                let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                print("🔍 WebSearch: Generated title: '\(generatedTitle)'")
+                sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                print("🔍 WebSearch: Title update completed")
+            }
+            
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
-            session = newSession(previousSession: session)
+            let newSessionInstance = newSession(previousSession: session)
+            sessions[chatSession.id] = newSessionInstance
+            
             // Retry with new session
             do {
-                let responseStream = session.streamResponse(to: prompt)
+                let responseStream = newSessionInstance.streamResponse(to: prompt)
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
-                    fullResponse = partialStream.description
+                    fullResponse = partialStream.content
                 }
+                
+                // Clear streaming response first to prevent duplicate display
+                userLLMResponse = nil
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Save transcript after successful retry response
+                saveTranscript(newSessionInstance.transcript, sessionId: sessionId)
+                
+                // Generate title after successful response if this is the first message
+                if isFirstMessage && chatSession.title.isEmpty {
+                    print("🔍 WebSearch: Generating title from AI response (retry). Session ID: \(chatSession.id)")
+                    let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                    print("🔍 WebSearch: Generated title: '\(generatedTitle)'")
+                    sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                    print("🔍 WebSearch: Title update completed")
+                }
                 
             } catch {
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
@@ -276,19 +391,60 @@ class LLM: ObservableObject {
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
         
-        // Clear streaming response to prevent duplicate display
-        userLLMResponse = nil
         isWebSearching = false
     }
     
-    func queryLLM(_ UIQuery: String, for chatSession: ChatSession) async throws {
+    func generateChatTitle(from aiResponse: String, for chatSession: ChatSession) async -> String {
+        let titlePrompt = """
+        Generate a short, descriptive title (2-4 words) for a chat conversation based on this AI response. The title should capture the main topic or subject matter.
+        
+        AI Response: "\(aiResponse)"
+        
+        Instructions:
+        1. Keep it concise (2-4 words maximum)
+        2. Focus on the main topic or subject matter
+        3. Don't include quotation marks
+        4. Make it suitable as a chat title
+        5. Use simple, clear language
+        
+        Title:
+        """
+        
+        let session = getSessionForChat(chatSession.id)
+        
+        do {
+            let responseStream = session.streamResponse(to: titlePrompt)
+            var fullResponse = ""
+            for try await partialStream in responseStream {
+                fullResponse = partialStream.content
+            }
+            
+            let cleanTitle = fullResponse
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\"", with: "")
+                .replacingOccurrences(of: """
+                , with: "")
+                .replacingOccurrences(of:
+ """, with: "")
+            
+            return cleanTitle.isEmpty ? "New Chat" : cleanTitle
+        } catch {
+            print("Error generating title: \(error)")
+            return "New Chat"
+        }
+    }
+    
+    func queryLLM(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
-        userLLMResponse = ""
+        userLLMResponse = nil
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using RAG
         
-        // Save user message
+        // Check if this is the first message in the session
+        let isFirstMessage = chatMessages.isEmpty
+        
+        // Save user message immediately so it displays right away
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
@@ -314,35 +470,70 @@ class LLM: ObservableObject {
                     
                     Answer:
                     """
+        
+        let session = getSessionForChat(chatSession.id)
+        
         do {
             let responseStream = session.streamResponse(to: prompt)
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
-                fullResponse = partialStream.description
+                fullResponse = partialStream.content
             }
+            
+            // Clear streaming response first to prevent duplicate display
+            userLLMResponse = nil
             
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             
+            // Save transcript after successful response
+            saveTranscript(session.transcript, sessionId: sessionId)
+            
+            // Generate title after successful response if this is the first message
+            if isFirstMessage && chatSession.title.isEmpty {
+                print("📚 RAG: Generating title from AI response. Session ID: \(chatSession.id)")
+                let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                print("📚 RAG: Generated title: '\(generatedTitle)'")
+                sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                print("📚 RAG: Title update completed")
+            }
+            
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
-            session = newSession(previousSession: session)
+            let newSessionInstance = newSession(previousSession: session)
+            sessions[chatSession.id] = newSessionInstance
+            
             // Retry with new session
             do {
-                let responseStream = session.streamResponse(to: prompt)
+                let responseStream = newSessionInstance.streamResponse(to: prompt)
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
-                    fullResponse = partialStream.description
+                    fullResponse = partialStream.content
                 }
+                
+                // Clear streaming response first to prevent duplicate display
+                userLLMResponse = nil
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Save transcript after successful retry response
+                saveTranscript(newSessionInstance.transcript, sessionId: sessionId)
+                
+                // Generate title after successful response if this is the first message
+                if isFirstMessage && chatSession.title.isEmpty {
+                    print("📚 RAG: Generating title from AI response (retry). Session ID: \(chatSession.id)")
+                    let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                    print("📚 RAG: Generated title: '\(generatedTitle)'")
+                    sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                    print("📚 RAG: Title update completed")
+                }
                 
             } catch {
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
@@ -373,19 +564,19 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
-        
-        // Clear streaming response to prevent duplicate display
-        userLLMResponse = nil
     }
     
-    func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession) async throws {
+    func queryLLMGeneral(_ UIQuery: String, for chatSession: ChatSession, sessionManager: ChatSessionManager) async throws {
         guard let sessionId = currentSessionId else { return }
         
-        userLLMResponse = ""
+        userLLMResponse = nil
         userLLMQuery = UIQuery
         webSearchResults = [] // Clear web search results when using general mode
         
-        // Save user message
+        // Check if this is the first message in the session
+        let isFirstMessage = chatMessages.isEmpty
+        
+        // Save user message immediately so it displays right away
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
@@ -405,35 +596,70 @@ class LLM: ObservableObject {
                     Answer:
                     """
         
+        let session = getSessionForChat(chatSession.id)
+        print("--------------------\nMODEL TRANSCRIPT:\n ", session.transcript)
+        
         do {
             let responseStream = session.streamResponse(to: prompt)
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
-                fullResponse = partialStream.description
+                fullResponse = partialStream.content
             }
+            
+            // Clear streaming response first to prevent duplicate display
+            userLLMResponse = nil
             
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+
+            // Save transcript after successful response
+            saveTranscript(session.transcript, sessionId: sessionId)
+
+            // Generate title after successful response if this is the first message
+            if isFirstMessage && chatSession.title.isEmpty {
+                print("💬 General: Generating title from AI response. Session ID: \(chatSession.id)")
+                let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                print("💬 General: Generated title: '\(generatedTitle)'")
+                sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                print("💬 General: Title update completed")
+            }
             
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             // New session, with some history from the previous session
-            session = newSession(previousSession: session)
+            let newSessionInstance = newSession(previousSession: session)
+            sessions[chatSession.id] = newSessionInstance
+            
             // Retry with new session
             do {
-                let responseStream = session.streamResponse(to: prompt)
+                let responseStream = newSessionInstance.streamResponse(to: prompt)
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
-                    fullResponse = partialStream.description
+                    fullResponse = partialStream.content
                 }
+                
+                // Clear streaming response first to prevent duplicate display
+                userLLMResponse = nil
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
                 chatMessages.append(assistantMessage)
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
+                
+                // Save transcript after successful retry response
+                saveTranscript(newSessionInstance.transcript, sessionId: sessionId)
+                
+                // Generate title after successful response if this is the first message
+                if isFirstMessage && chatSession.title.isEmpty {
+                    print("💬 General: Generating title from AI response (retry). Session ID: \(chatSession.id)")
+                    let generatedTitle = await generateChatTitle(from: fullResponse, for: chatSession)
+                    print("💬 General: Generated title: '\(generatedTitle)'")
+                    sessionManager.updateSessionTitleIfEmpty(chatSession, with: generatedTitle)
+                    print("💬 General: Title update completed")
+                }
                 
             } catch {
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
@@ -464,9 +690,6 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         }
-        
-        // Clear streaming response to prevent duplicate display
-        userLLMResponse = nil
     }
     
     
