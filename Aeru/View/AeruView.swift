@@ -31,7 +31,6 @@ struct AeruView: View {
     @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
     @State private var showConnectivityAlert: Bool = false
-    @State private var showDuplicateChatAlert: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
     // Sidebar animation properties
@@ -65,7 +64,10 @@ struct AeruView: View {
             // Successfully created new chat
             break
         case .duplicateUntitled:
-            showDuplicateChatAlert = true
+            // Redirect to existing new chat instead of showing alert
+            if let existingNewChat = sessionManager.sessions.first(where: { $0.title.isEmpty }) {
+                sessionManager.selectSession(existingNewChat)
+            }
         case .duplicateTitle, .databaseError:
             // Handle other errors if needed
             break
