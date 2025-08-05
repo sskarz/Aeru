@@ -40,10 +40,17 @@ class RAGModel {
             print("ERROR: Collection is nil")
             return 
         }
-        guard let embedding = generateEmbedding(for: entry) else {
+        
+        // Move embedding generation to background thread
+        let embedding = await Task.detached(priority: .userInitiated) {
+            return self.generateEmbedding(for: entry)
+        }.value
+        
+        guard let embedding = embedding else {
             print("ERROR: Failed to generate embedding for entry: \(String(entry.prefix(100)))...")
             return
         }
+        
         print("SUCCESS: Adding entry to collection")
         print("COLLECTION: ", collection)
         print("ENTRY STRING: ", String(entry.prefix(200)))
@@ -97,7 +104,13 @@ class RAGModel {
             print("ERROR: Collection is nil in findLLMNeighbors")
             return 
         }
-        guard let queryEmbedding = generateEmbedding(for: query) else {
+        
+        // Move query embedding generation to background thread
+        let queryEmbedding = await Task.detached(priority: .userInitiated) {
+            return self.generateEmbedding(for: query)
+        }.value
+        
+        guard let queryEmbedding = queryEmbedding else {
             print("ERROR: Failed to generate query embedding")
             return
         }

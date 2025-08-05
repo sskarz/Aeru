@@ -257,11 +257,15 @@ class LLM: ObservableObject {
         let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
         await rag.loadCollection()
         
-        // Embed all scraped content into RAG
-        for result in results {
-            let chunks = webSearch.chunkText(result.content)
-            for chunk in chunks {
-                await rag.addEntry(chunk)
+        // Embed all scraped content into RAG - process chunks concurrently for better performance
+        await withTaskGroup(of: Void.self) { group in
+            for result in results {
+                let chunks = webSearch.chunkText(result.content)
+                for chunk in chunks {
+                    group.addTask {
+                        await rag.addEntry(chunk)
+                    }
+                }
             }
         }
         
