@@ -24,6 +24,7 @@ struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
     @StateObject private var networkConnectivity = NetworkConnectivity()
+    @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     
     @State private var messageText: String = ""
     // useWebSearch is now per-session, computed from currentSession
@@ -183,6 +184,7 @@ struct AeruView: View {
         } message: {
             Text("Please turn on cellular or WiFi to use web search functionality.")
         }
+        .preferredColorScheme(AppColorScheme(rawValue: selectedColorScheme)?.colorScheme)
     }
     
     private var headerView: some View {

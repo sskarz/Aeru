@@ -270,8 +270,26 @@ struct ChatSessionRow: View {
     }
 }
 
+enum AppColorScheme: String, CaseIterable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+    
+    var colorScheme: SwiftUI.ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+}
+
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     
     var body: some View {
         NavigationView {
@@ -289,6 +307,35 @@ struct SettingsView: View {
                     }
                     .padding(.top, 20)
                 }
+                
+                // Appearance Section
+                VStack(spacing: 16) {
+                    Text("Appearance")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("Color Scheme")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            Picker("Color Scheme", selection: $selectedColorScheme) {
+                                ForEach(AppColorScheme.allCases, id: \.rawValue) { colorScheme in
+                                    Text(colorScheme.rawValue).tag(colorScheme.rawValue)
+                                }
+                            }
+                            .pickerStyle(MenuPickerStyle())
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal, 20)
                 
                 // Links Section
                 VStack(spacing: 16) {
