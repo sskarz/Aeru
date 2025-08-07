@@ -116,7 +116,11 @@ class SpeechRecognitionManager: ObservableObject {
                     
                     if error != nil || result?.isFinal == true {
                         let wasRecording = self?.isRecording ?? false
-                        self?.stopRecording()
+                        
+                        // Always stop recording to clean up audio session
+                        if wasRecording {
+                            self?.stopRecording()
+                        }
                         
                         if let error = error, wasRecording {
                             // Only show error if we were still recording (not manually cancelled)
@@ -150,7 +154,9 @@ class SpeechRecognitionManager: ObservableObject {
         recognitionTask = nil
         
         do {
-            try AVAudioSession.sharedInstance().setActive(false)
+            let audioSession = AVAudioSession.sharedInstance()
+            // Properly deactivate and allow other audio sessions to resume
+            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             print("Failed to deactivate audio session: \(error)")
         }

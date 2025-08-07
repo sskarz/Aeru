@@ -158,6 +158,11 @@ struct AeruView: View {
             }
         }
         .onChange(of: sessionManager.currentSession) { oldValue, newValue in
+            // Stop TTS when switching to a different chat session
+            if oldValue?.id != newValue?.id {
+                textToSpeechManager.stopSpeaking()
+            }
+            
             if let session = newValue {
                 llm.switchToSession(session)
             }

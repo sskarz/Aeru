@@ -60,10 +60,13 @@ class TextToSpeechManager: NSObject, ObservableObject {
         currentUtterance = utterance
         
         do {
-            try AVAudioSession.sharedInstance().setActive(true)
+            let audioSession = AVAudioSession.sharedInstance()
+            // Reconfigure audio session for playback (in case it was changed by STT)
+            try audioSession.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try audioSession.setActive(true)
             speechSynthesizer.speak(utterance)
         } catch {
-            print("Failed to activate audio session: \(error)")
+            print("Failed to activate audio session for TTS: \(error)")
         }
     }
     
