@@ -13,6 +13,7 @@ import WebKit
 import UIKit
 import MarkdownUI
 import FoundationModels
+import Speech
 
 
 struct BrowserURL: Identifiable {
@@ -24,6 +25,7 @@ struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
     @StateObject private var networkConnectivity = NetworkConnectivity()
+    @StateObject private var speechRecognitionManager = SpeechRecognitionManager()
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     
     @State private var messageText: String = ""
@@ -176,6 +178,23 @@ struct AeruView: View {
             Button("OK") { }
         } message: {
             Text("Please turn on cellular or WiFi to use web search functionality.")
+        }
+        .alert("Speech Recognition Error", isPresented: $speechRecognitionManager.hasError) {
+            Button("OK") { 
+                speechRecognitionManager.clearError()
+            }
+        } message: {
+            Text(speechRecognitionManager.errorMessage)
+        }
+        .onChange(of: speechRecognitionManager.recognizedText) { oldValue, newValue in
+            if !newValue.isEmpty {
+                messageText = newValue
+            }
+        }
+        .onChange(of: speechRecognitionManager.isRecording) { oldValue, newValue in
+            if !newValue && !speechRecognitionManager.recognizedText.isEmpty {
+                speechRecognitionManager.clearRecognizedText()
+            }
         }
         .preferredColorScheme(AppColorScheme(rawValue: selectedColorScheme)?.colorScheme)
     }
@@ -331,7 +350,7 @@ struct AeruView: View {
     
     private var inputView: some View {
         VStack(spacing: 12) {
-            // Upload button, text input and send button
+            // Upload button, text input, voice button and send button
             HStack(spacing: 12) {
                 // Document upload button
                 Button(action: { 
@@ -362,6 +381,25 @@ struct AeruView: View {
                     .disableAutocorrection(false)
                     .glassEffect(.regular.interactive())
                 
+                // Voice input button
+                Button(action: {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    handleVoiceButtonTap()
+                }) {
+                    Image(systemName: speechRecognitionManager.isRecording ? "mic.fill" : "mic")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(speechRecognitionManager.isRecording ? .red : .blue)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(speechRecognitionManager.isRecording ? 
+                                      Color.red.opacity(0.1) : Color(.systemGray6))
+                        )
+                }
+                .disabled(isModelResponding)
+                .glassEffect(.regular.interactive())
+                
                 Button(action: {
                     if !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isModelResponding {
                         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -387,6 +425,15 @@ struct AeruView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(Color(.systemBackground))
+    }
+    
+    private func handleVoiceButtonTap() {
+        if speechRecognitionManager.isRecording {
+            speechRecognitionManager.stopRecording()
+        } else {
+            isMessageFieldFocused = false
+            speechRecognitionManager.startRecording()
+        }
     }
     
     private func sendMessage() {
