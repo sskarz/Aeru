@@ -38,6 +38,7 @@ struct AeruView: View {
     @State private var showConnectivityAlert: Bool = false
     @State private var showSources: Bool = false
     @State private var sourcesToShow: [WebSearchResult] = []
+    @State private var showVoiceConversation: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
     // Sidebar animation properties
@@ -181,6 +182,17 @@ struct AeruView: View {
         }
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
+        }
+        .sheet(isPresented: $showVoiceConversation) {
+            if let currentSession = sessionManager.currentSession {
+                VoiceConversationView(
+                    llm: llm,
+                    speechRecognitionManager: speechRecognitionManager,
+                    textToSpeechManager: textToSpeechManager,
+                    currentSession: currentSession,
+                    sessionManager: sessionManager
+                )
+            }
         }
         .alert("No Internet Connection", isPresented: $showConnectivityAlert) {
             Button("OK") { }
@@ -361,6 +373,30 @@ struct AeruView: View {
     
     private var inputView: some View {
         VStack(spacing: 12) {
+            // Voice conversation button
+            Button(action: {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                showVoiceConversation = true
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "mic.and.signal.meter")
+                        .font(.system(size: 16, weight: .medium))
+                    Text("Voice Conversation")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.blue)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.blue, lineWidth: 1)
+                        .background(Color.blue.opacity(0.05))
+                )
+            }
+            .disabled(isModelResponding)
+            
             // Upload button, text input, voice button and send button
             HStack(spacing: 12) {
                 // Document upload button
