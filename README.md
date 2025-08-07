@@ -14,6 +14,9 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ### 👨🏽‍💻 [Demo Video](https://youtube.com/shorts/BJqX9k7rXzo?feature=share)
 
+### 📱 [TestFlight Download](https://youtube.com/shorts/BJqX9k7rXzo?feature=share)
+- Must use an [Apple Intelligence activated device](https://9to5mac.com/every-device-that-supports-apple-intelligence/)
+- Latest version of iOS 26 Beta (Dev Beta 5, Public Beta 2)
 
 ## ✨ Features
 
