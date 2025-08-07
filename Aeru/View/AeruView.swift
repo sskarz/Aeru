@@ -26,6 +26,7 @@ struct AeruView: View {
     @StateObject private var sessionManager = ChatSessionManager()
     @StateObject private var networkConnectivity = NetworkConnectivity()
     @StateObject private var speechRecognitionManager = SpeechRecognitionManager()
+    @StateObject private var textToSpeechManager = TextToSpeechManager()
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     
     @State private var messageText: String = ""
