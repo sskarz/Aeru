@@ -62,6 +62,8 @@ struct AeruView: View {
     }
     
     private func handleNewChatCreation() {
+        // Stop any ongoing TTS when starting a new chat
+        textToSpeechManager.stopSpeaking()
         _ = sessionManager.getOrCreateNewChat()
     }
     
@@ -197,6 +199,9 @@ struct AeruView: View {
                 speechRecognitionManager.clearRecognizedText()
             }
         }
+        .onDisappear {
+            textToSpeechManager.stopSpeaking()
+        }
         .preferredColorScheme(AppColorScheme(rawValue: selectedColorScheme)?.colorScheme)
     }
     
@@ -268,7 +273,7 @@ struct AeruView: View {
                         }, onSourcesTap: { sources in
                             sourcesToShow = sources
                             showSources = true
-                        })
+                        }, textToSpeechManager: textToSpeechManager)
                         .id(message.id)
                     }
                     
@@ -279,7 +284,7 @@ struct AeruView: View {
                         }, onSourcesTap: { sources in
                             sourcesToShow = sources
                             showSources = true
-                        })
+                        }, textToSpeechManager: textToSpeechManager)
                         .id("streaming")
                     }
                     
@@ -447,6 +452,9 @@ struct AeruView: View {
             return
         }
         
+        // Stop any ongoing TTS when sending a new message
+        textToSpeechManager.stopSpeaking()
+        
         // Clear input
         messageText = ""
         
@@ -499,11 +507,13 @@ struct ChatBubbleView: View {
     let message: ChatMessage
     let onLinkTap: ((String) -> Void)?
     let onSourcesTap: (([WebSearchResult]) -> Void)?
+    let textToSpeechManager: TextToSpeechManager?
     
-    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil) {
+    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil, textToSpeechManager: TextToSpeechManager? = nil) {
         self.message = message
         self.onLinkTap = onLinkTap
         self.onSourcesTap = onSourcesTap
+        self.textToSpeechManager = textToSpeechManager
     }
     
     var body: some View {
@@ -535,30 +545,61 @@ struct ChatBubbleView: View {
                         .foregroundColor(.primary)
                 }
                 
-                // Sources button
-                if let sources = message.sources, !sources.isEmpty {
-                    Button(action: {
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
-                        onSourcesTap?(sources)
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "link")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
-                            Text("Sources (\(sources.count))")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .foregroundColor(.blue)
+                // Action buttons for AI responses
+                if !message.isUser {
+                    HStack(spacing: 8) {
+                        // Text-to-Speech button
+                        if let ttsManager = textToSpeechManager {
+                            Button(action: {
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                handleTTSButtonTap(ttsManager: ttsManager)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: getTTSButtonIcon(ttsManager: ttsManager))
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                    Text(getTTSButtonText(ttsManager: ttsManager))
+                                        .font(.caption2)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.blue)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color.blue.opacity(0.1))
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.blue.opacity(0.1))
-                        )
+                        
+                        // Sources button
+                        if let sources = message.sources, !sources.isEmpty {
+                            Button(action: {
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                onSourcesTap?(sources)
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "link")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                    Text("Sources (\(sources.count))")
+                                        .font(.caption2)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.blue)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color.blue.opacity(0.1))
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
             }
             
@@ -566,6 +607,38 @@ struct ChatBubbleView: View {
                 Spacer(minLength: 50)
             }
         }
+    }
+    
+    private func handleTTSButtonTap(ttsManager: TextToSpeechManager) {
+        if ttsManager.isSpeaking && ttsManager.currentText == message.text {
+            // If currently speaking this message, toggle pause/play
+            ttsManager.toggle()
+        } else {
+            // Start speaking this message
+            ttsManager.speak(message.text)
+        }
+    }
+    
+    private func getTTSButtonIcon(ttsManager: TextToSpeechManager) -> String {
+        if ttsManager.currentText == message.text {
+            if ttsManager.isSpeaking && !ttsManager.isPaused {
+                return "pause.fill"
+            } else if ttsManager.isPaused {
+                return "play.fill"
+            }
+        }
+        return "speaker.wave.2.fill"
+    }
+    
+    private func getTTSButtonText(ttsManager: TextToSpeechManager) -> String {
+        if ttsManager.currentText == message.text {
+            if ttsManager.isSpeaking && !ttsManager.isPaused {
+                return "Pause"
+            } else if ttsManager.isPaused {
+                return "Resume"
+            }
+        }
+        return "Listen"
     }
     
     private func copyToClipboard(_ text: String) {
