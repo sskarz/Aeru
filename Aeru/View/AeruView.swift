@@ -217,14 +217,19 @@ struct AeruView: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                // New chat button
-                Button(action: handleNewChatCreation) {
-                    Image(systemName: "plus.message")
-                        .font(.title3)
-                        .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
+                // New chat button - disappears when unavailable
+                if !shouldDisableNewChatButton {
+                    Button(action: handleNewChatCreation) {
+                        Image(systemName: "plus.message")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                            .frame(width: 24, height: 24)
+                    }
+                } else {
+                    // Empty spacer to maintain layout balance
+                    Spacer()
                         .frame(width: 24, height: 24)
                 }
-                .disabled(shouldDisableNewChatButton)
                 
             }
             .padding(.horizontal, 16)
