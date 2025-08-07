@@ -33,6 +33,8 @@ struct AeruView: View {
     @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
     @State private var showConnectivityAlert: Bool = false
+    @State private var showSources: Bool = false
+    @State private var sourcesToShow: [WebSearchResult] = []
     @FocusState private var isMessageFieldFocused: Bool
     
     // Sidebar animation properties
@@ -176,6 +178,11 @@ struct AeruView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+        .sheet(isPresented: $showSources) {
+            SourcesView(sources: sourcesToShow) { url in
+                webBrowserURL = BrowserURL(url: url)
+            }
+        }
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
         }
@@ -239,17 +246,23 @@ struct AeruView: View {
                     }
                     
                     ForEach(llm.chatMessages) { message in
-                        ChatBubbleView(message: message) { url in
+                        ChatBubbleView(message: message, onLinkTap: { url in
                             webBrowserURL = BrowserURL(url: url)
-                        }
+                        }, onSourcesTap: { sources in
+                            sourcesToShow = sources
+                            showSources = true
+                        })
                         .id(message.id)
                     }
                     
                     // Streaming response display
                     if let streamingResponse = llm.userLLMResponse {
-                        ChatBubbleView(message: ChatMessage(text: streamingResponse.content, isUser: false)) { url in
+                        ChatBubbleView(message: ChatMessage(text: streamingResponse.content, isUser: false), onLinkTap: { url in
                             webBrowserURL = BrowserURL(url: url)
-                        }
+                        }, onSourcesTap: { sources in
+                            sourcesToShow = sources
+                            showSources = true
+                        })
                         .id("streaming")
                     }
                     
@@ -429,10 +442,12 @@ struct AeruView: View {
 struct ChatBubbleView: View {
     let message: ChatMessage
     let onLinkTap: ((String) -> Void)?
+    let onSourcesTap: (([WebSearchResult]) -> Void)?
     
-    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil) {
+    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil) {
         self.message = message
         self.onLinkTap = onLinkTap
+        self.onSourcesTap = onSourcesTap
     }
     
     var body: some View {
@@ -464,53 +479,28 @@ struct ChatBubbleView: View {
                         .foregroundColor(.primary)
                 }
                 
-                // Web sources
+                // Sources button
                 if let sources = message.sources, !sources.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sources:")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)  
-                        
-                        ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
-                            Button(action: {
-                                onLinkTap?(source.url)
-                            }) {
-                                HStack(alignment: .top, spacing: 4) {
-                                    Text("•")
-                                        .font(.caption2)
-                                        .foregroundColor(.blue)
-                                    Text(source.title)
-                                        .font(.caption2)
-                                        .foregroundColor(.blue)
-                                        .lineLimit(1)
-                                        .multilineTextAlignment(.leading)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contextMenu {
-                                Button(action: {
-                                    copyToClipboard(source.url)
-                                }) {
-                                    Label("Copy Link", systemImage: "doc.on.clipboard")
-                                }
-                                
-                                Button(action: {
-                                    onLinkTap?(source.url)
-                                }) {
-                                    Label("Open Link", systemImage: "safari")
-                                }
-                            }
+                    Button(action: {
+                        onSourcesTap?(sources)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "link")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                            Text("Sources (\(sources.count))")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.blue)
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.blue.opacity(0.1))
+                        )
                     }
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue.opacity(0.1))
-                    )
+                    .buttonStyle(.plain)
                 }
             }
             
@@ -556,6 +546,92 @@ struct TypingIndicatorView: View {
         .onAppear {
             animating = true
         }
+    }
+}
+
+struct SourcesView: View {
+    let sources: [WebSearchResult]
+    let onLinkTap: ((String) -> Void)?
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "link")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                Text("\(index + 1).")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            
+                            Text(source.title)
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Text(source.url)
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            if !source.content.isEmpty {
+                                Text(source.content)
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(3)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .onTapGesture {
+                            onLinkTap?(source.url)
+                            dismiss()
+                        }
+                        .contextMenu {
+                            Button(action: {
+                                copyToClipboard(source.url)
+                            }) {
+                                Label("Copy Link", systemImage: "doc.on.clipboard")
+                            }
+                            
+                            Button(action: {
+                                onLinkTap?(source.url)
+                                dismiss()
+                            }) {
+                                Label("Open Link", systemImage: "safari")
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .navigationTitle("Sources")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        UIPasteboard.general.string = text
     }
 }
 
@@ -795,6 +871,9 @@ struct WebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         self.webView = webView
         
+        // Initialize the coordinator with the current URL
+        context.coordinator.lastLoadedURL = url
+        
         if let validURL = URL(string: url) {
             let request = URLRequest(url: validURL)
             webView.load(request)
@@ -804,11 +883,14 @@ struct WebView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        guard let currentURL = uiView.url?.absoluteString, currentURL != url else { return }
-        
-        if let validURL = URL(string: url) {
-            let request = URLRequest(url: validURL)
-            uiView.load(request)
+        // Only load if this is a different URL than what we last loaded
+        // This prevents infinite reload loops
+        if url != context.coordinator.lastLoadedURL {
+            context.coordinator.lastLoadedURL = url
+            if let validURL = URL(string: url) {
+                let request = URLRequest(url: validURL)
+                uiView.load(request)
+            }
         }
     }
     
@@ -818,6 +900,7 @@ struct WebView: UIViewRepresentable {
     
     class Coordinator: NSObject, WKNavigationDelegate {
         let parent: WebView
+        var lastLoadedURL: String = ""
         
         init(_ parent: WebView) {
             self.parent = parent
