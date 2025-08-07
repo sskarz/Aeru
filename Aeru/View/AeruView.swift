@@ -91,6 +91,8 @@ struct AeruView: View {
                     Color.black.opacity(getOverlayOpacity())
                         .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: showSidebar)
                         .onTapGesture {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
                             withAnimation {
                                 showSidebar = false
                             }
@@ -183,6 +185,8 @@ struct AeruView: View {
             HStack(spacing: 16) {
                 // Sidebar toggle
                 Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
                     isMessageFieldFocused = false
                     showSidebar.toggle()
                 }) {
@@ -203,7 +207,11 @@ struct AeruView: View {
                 
                 // New chat button - disappears when unavailable
                 if !shouldHideNewChatButton {
-                    Button(action: handleNewChatCreation) {
+                    Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        handleNewChatCreation()
+                    }) {
                         Image(systemName: "plus.message")
                             .font(.title3)
                             .foregroundColor(.blue)
@@ -326,7 +334,11 @@ struct AeruView: View {
             // Upload button, text input and send button
             HStack(spacing: 12) {
                 // Document upload button
-                Button(action: { showKnowledgeBase.toggle() }) {
+                Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    showKnowledgeBase.toggle() 
+                }) {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
@@ -350,7 +362,13 @@ struct AeruView: View {
                     .disableAutocorrection(false)
                     .glassEffect(.regular.interactive())
                 
-                Button(action: sendMessage) {
+                Button(action: {
+                    if !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isModelResponding {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                    }
+                    sendMessage()
+                }) {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
@@ -405,20 +423,21 @@ struct AeruView: View {
         // Use a lower threshold for iOS 26 compatibility
         let threshold = sidebarWidth * 0.3
         
+        let willToggleSidebar: Bool
         if showSidebar {
             // Sidebar is open - check if should close
-            if translation < -threshold || velocity < -500 {
-                showSidebar = false
-            } else {
-                showSidebar = true // Keep open
-            }
+            willToggleSidebar = translation < -threshold || velocity < -500
+            showSidebar = !willToggleSidebar
         } else {
             // Sidebar is closed - check if should open
-            if translation > threshold || velocity > 500 {
-                showSidebar = true
-            } else {
-                showSidebar = false // Keep closed
-            }
+            willToggleSidebar = translation > threshold || velocity > 500
+            showSidebar = willToggleSidebar
+        }
+        
+        // Add haptic feedback for successful swipe gestures
+        if willToggleSidebar {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
         }
     }
     
@@ -471,6 +490,8 @@ struct ChatBubbleView: View {
                 // Sources button
                 if let sources = message.sources, !sources.isEmpty {
                     Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
                         onSourcesTap?(sources)
                     }) {
                         HStack(spacing: 6) {
@@ -585,6 +606,8 @@ struct SourcesView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
                         .onTapGesture {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
                             onLinkTap?(source.url)
                             dismiss()
                         }
@@ -643,7 +666,11 @@ struct KnowledgeBaseView: View {
         NavigationView {
             VStack(spacing: 16) {
                 
-                Button(action: { showDocumentPicker = true }) {
+                Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    showDocumentPicker = true 
+                }) {
                     HStack {
                         Image(systemName: "doc.badge.plus")
                         Text("Upload PDF Document")
@@ -667,6 +694,8 @@ struct KnowledgeBaseView: View {
                 }
                 
                 Button(action: {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
                     sessionManager.updateSessionWebSearch(session, useWebSearch: !useWebSearch)
                 }) {
                     HStack {

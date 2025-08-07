@@ -27,6 +27,8 @@ struct ChatSidebar: View {
                 HStack {
                     if isSelectionMode {
                         Button("Cancel") {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
                             isSelectionMode = false
                             selectedSessions.removeAll()
                         }
@@ -41,7 +43,11 @@ struct ChatSidebar: View {
                         
                         Spacer()
                         
-                        Button(action: { showingBulkDeleteAlert = true }) {
+                        Button(action: { 
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            showingBulkDeleteAlert = true 
+                        }) {
                             Image(systemName: "trash")
                                 .font(.title3)
                                 .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
@@ -55,6 +61,8 @@ struct ChatSidebar: View {
                         Spacer()
                         
                         Button(action: { 
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
                             _ = sessionManager.getOrCreateNewChat()
                         }) {
                             Image(systemName: "plus.message")
@@ -81,12 +89,16 @@ struct ChatSidebar: View {
                             isChecked: selectedSessions.contains(session.id),
                             onSelect: {
                                 if isSelectionMode {
+                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                    impactFeedback.impactOccurred()
                                     if selectedSessions.contains(session.id) {
                                         selectedSessions.remove(session.id)
                                     } else {
                                         selectedSessions.insert(session.id)
                                     }
                                 } else {
+                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                    impactFeedback.impactOccurred()
                                     sessionManager.selectSession(session)
                                 }
                             },
@@ -110,7 +122,11 @@ struct ChatSidebar: View {
                 Divider()
                 
                 HStack {
-                    Button(action: { showingSettings = true }) {
+                    Button(action: { 
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        showingSettings = true 
+                    }) {
                         HStack {
                             Image(systemName: "gear")
                                 .font(.title3)
@@ -126,6 +142,8 @@ struct ChatSidebar: View {
                     Spacer()
                     
                     Button(action: { 
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
                         isSelectionMode = true 
                     }) {
                         Image(systemName: "checkmark.circle")
@@ -254,6 +272,8 @@ struct ChatSessionRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if !isSelectionMode {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
                 onSelect()
             }
         }
