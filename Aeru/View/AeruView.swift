@@ -49,11 +49,8 @@ struct AeruView: View {
         llm.userLLMResponse != nil || llm.isWebSearching
     }
     
-    private var shouldDisableNewChatButton: Bool {
-        // Enable if no sessions exist (user needs a way to create first chat)
-        guard !sessionManager.sessions.isEmpty else { return false }
-        
-        // Disable if current chat is empty (new chat with 0 messages) or model is responding
+    private var shouldHideNewChatButton: Bool {
+        // Hide if current chat is empty (new chat with 0 messages) or model is responding
         return llm.chatMessages.isEmpty || isModelResponding
     }
     
@@ -62,20 +59,7 @@ struct AeruView: View {
     }
     
     private func handleNewChatCreation() {
-        let result = sessionManager.createNewSession(title: "")
-        switch result {
-        case .success(_):
-            // Successfully created new chat
-            break
-        case .duplicateUntitled:
-            // Redirect to existing new chat instead of showing alert
-            if let existingNewChat = sessionManager.sessions.first(where: { $0.title.isEmpty }) {
-                sessionManager.selectSession(existingNewChat)
-            }
-        case .duplicateTitle, .databaseError:
-            // Handle other errors if needed
-            break
-        }
+        _ = sessionManager.getOrCreateNewChat()
     }
     
     var body: some View {
@@ -115,7 +99,7 @@ struct AeruView: View {
                 )
                 
                 // Sidebar
-                ChatSidebar(sessionManager: sessionManager, shouldDisableNewChatButton: shouldDisableNewChatButton)
+                ChatSidebar(sessionManager: sessionManager)
                     .frame(width: sidebarWidth)
                     .offset(x: -sidebarWidth)
                     .offset(x: max(offset + gestureOffset, 0))
@@ -156,9 +140,9 @@ struct AeruView: View {
                     sessionManager.loadSessions()
                 }
                 
-                // Only create a new session if none exist after loading
-                if sessionManager.sessions.isEmpty {
-                    _ = sessionManager.createNewSession()
+                // Always ensure there's a current session (empty chat)
+                if sessionManager.currentSession == nil {
+                    _ = sessionManager.getOrCreateNewChat()
                 }
                 
                 if let currentSession = sessionManager.currentSession {
@@ -218,7 +202,7 @@ struct AeruView: View {
                 }
                 
                 // New chat button - disappears when unavailable
-                if !shouldDisableNewChatButton {
+                if !shouldHideNewChatButton {
                     Button(action: handleNewChatCreation) {
                         Image(systemName: "plus.message")
                             .font(.title3)

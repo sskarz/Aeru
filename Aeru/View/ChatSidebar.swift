@@ -11,7 +11,6 @@ import Foundation
 
 struct ChatSidebar: View {
     @ObservedObject var sessionManager: ChatSessionManager
-    let shouldDisableNewChatButton: Bool
     @State private var editingSession: ChatSession?
     @State private var editTitle = ""
     @State private var showingDuplicateTitleAlert = false
@@ -56,14 +55,13 @@ struct ChatSidebar: View {
                         Spacer()
                         
                         Button(action: { 
-                            _ = sessionManager.createNewSession(title: "")
+                            _ = sessionManager.getOrCreateNewChat()
                         }) {
                             Image(systemName: "plus.message")
                                 .font(.title3)
-                                .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
+                                .foregroundColor(.blue)
                                 .frame(width: 24, height: 24)
                         }
-                        .disabled(shouldDisableNewChatButton)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -75,7 +73,7 @@ struct ChatSidebar: View {
             // Chat sessions list
             ScrollView {
                 LazyVStack(spacing: 6) {
-                    ForEach(sessionManager.sessions) { session in
+                    ForEach(sessionManager.displayedSessions) { session in
                         ChatSessionRow(
                             session: session,
                             isSelected: sessionManager.currentSession?.id == session.id,

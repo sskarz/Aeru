@@ -41,6 +41,14 @@ class ChatSessionManager: ObservableObject {
     
     private let databaseManager = DatabaseManager.shared
     
+    // Filtered sessions - only show sessions with messages (like ChatGPT)
+    var displayedSessions: [ChatSession] {
+        return sessions.filter { session in
+            let messages = databaseManager.getMessages(for: session.id)
+            return messages.count > 0
+        }
+    }
+    
     init() {
         // Load sessions asynchronously to avoid blocking UI
         Task {
@@ -198,6 +206,35 @@ class ChatSessionManager: ObservableObject {
         }
         
         // Keep the chat in its current position - removed repositioning logic
+    }
+    
+    // Get or create a new empty chat (ChatGPT style)
+    func getOrCreateNewChat() -> ChatSession {
+        // Look for existing empty chat (no messages)
+        if let emptyChat = sessions.first(where: { session in
+            let messages = databaseManager.getMessages(for: session.id)
+            return messages.count == 0
+        }) {
+            currentSession = emptyChat
+            return emptyChat
+        }
+        
+        // Create new empty chat if none exists
+        let result = createNewSession(title: "")
+        switch result {
+        case .success(let newSession):
+            return newSession
+        case .duplicateUntitled:
+            // This shouldn't happen with our new logic, but handle it
+            if let existingNewChat = sessions.first(where: { $0.title.isEmpty }) {
+                currentSession = existingNewChat
+                return existingNewChat
+            }
+            fallthrough
+        case .duplicateTitle, .databaseError:
+            // Fallback - return current session or first session
+            return currentSession ?? sessions.first ?? ChatSession(id: UUID().uuidString, title: "", collectionName: "collection_\(UUID().uuidString)", createdAt: Date(), updatedAt: Date(), useWebSearch: false)
+        }
     }
 }
 
