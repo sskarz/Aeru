@@ -52,7 +52,7 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ### Prerequisites
 - **iPhone 15 Pro or higher end model REQUIRED**
-- **iOS 26.0 DEV/PUBLIC BETA REQUIRED+**
+- **iOS 26.0 DEV 5/PUBLIC BETA 2 REQUIRED+**
 - **Xcode 16.0+**
 - **Swift 6+**
 
