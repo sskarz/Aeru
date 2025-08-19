@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Platform](https://img.shields.io/badge/Platform-iOS-lightgrey.svg)](https://www.apple.com/ios/)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org/)
-[![Xcode](https://img.shields.io/badge/Xcode-16.0+-blue.svg)](https://developer.apple.com/xcode/)
+[![Xcode](https://img.shields.io/badge/Xcode-26.0+-blue.svg)](https://developer.apple.com/xcode/)
 
 > **An intelligent iOS application that combines Retrieval-Augmented Generation (RAG) and Web Search functions to provide contextually aware AI responses.**
 
