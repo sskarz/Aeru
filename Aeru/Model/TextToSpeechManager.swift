@@ -5,7 +5,6 @@ import Combine
 @MainActor
 class TextToSpeechManager: NSObject, ObservableObject {
     @Published var isSpeaking = false
-    @Published var isPaused = false
     @Published var currentText = ""
     @Published var speechRate: Float = 0.5
     @Published var availableVoices: [AVSpeechSynthesisVoice] = []
@@ -70,15 +69,6 @@ class TextToSpeechManager: NSObject, ObservableObject {
         }
     }
     
-    func pauseSpeaking() {
-        guard isSpeaking && !isPaused else { return }
-        speechSynthesizer.pauseSpeaking(at: .word)
-    }
-    
-    func continueSpeaking() {
-        guard isSpeaking && isPaused else { return }
-        speechSynthesizer.continueSpeaking()
-    }
     
     func stopSpeaking() {
         speechSynthesizer.stopSpeaking(at: .immediate)
@@ -105,15 +95,6 @@ class TextToSpeechManager: NSObject, ObservableObject {
         speak(text)
     }
     
-    func toggle() {
-        if isSpeaking {
-            if isPaused {
-                continueSpeaking()
-            } else {
-                pauseSpeaking()
-            }
-        }
-    }
 }
 
 // MARK: - AVSpeechSynthesizerDelegate
@@ -121,26 +102,13 @@ extension TextToSpeechManager: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
         Task { @MainActor in
             isSpeaking = true
-            isPaused = false
         }
     }
     
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didPause utterance: AVSpeechUtterance) {
-        Task { @MainActor in
-            isPaused = true
-        }
-    }
-    
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didContinue utterance: AVSpeechUtterance) {
-        Task { @MainActor in
-            isPaused = false
-        }
-    }
     
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
             isSpeaking = false
-            isPaused = false
             currentText = ""
             currentUtterance = nil
             
@@ -156,7 +124,6 @@ extension TextToSpeechManager: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         Task { @MainActor in
             isSpeaking = false
-            isPaused = false
             currentText = ""
             currentUtterance = nil
             

@@ -251,8 +251,8 @@ struct VoiceConversationView: View {
     private func handleTTSButtonTap() {
         print("🔊 VoiceConversationView: TTS button tapped, isSpeaking: \(textToSpeechManager.isSpeaking)")
         if textToSpeechManager.isSpeaking {
-            print("🔊 VoiceConversationView: Toggling TTS (pause/resume)")
-            textToSpeechManager.toggle()
+            print("🔊 VoiceConversationView: Stopping TTS")
+            textToSpeechManager.stopSpeaking()
         } else {
             print("🔊 VoiceConversationView: Starting TTS with text: '\(aiResponse.prefix(50))...'")
             textToSpeechManager.speak(aiResponse)
@@ -270,19 +270,15 @@ struct VoiceConversationView: View {
     }
     
     private func getTTSButtonIcon() -> String {
-        if textToSpeechManager.isSpeaking && !textToSpeechManager.isPaused {
-            return "pause.fill"
-        } else if textToSpeechManager.isPaused {
-            return "play.fill"
+        if textToSpeechManager.isSpeaking {
+            return "stop.fill"
         }
         return "speaker.wave.2.fill"
     }
     
     private func getTTSButtonText() -> String {
-        if textToSpeechManager.isSpeaking && !textToSpeechManager.isPaused {
-            return "Pause"
-        } else if textToSpeechManager.isPaused {
-            return "Resume"
+        if textToSpeechManager.isSpeaking {
+            return "Stop"
         }
         return "Listen to Response"
     }

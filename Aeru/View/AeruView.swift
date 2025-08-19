@@ -660,8 +660,8 @@ struct ChatBubbleView: View {
     
     private func handleTTSButtonTap(ttsManager: TextToSpeechManager) {
         if ttsManager.isSpeaking && ttsManager.currentText == message.text {
-            // If currently speaking this message, toggle pause/play
-            ttsManager.toggle()
+            // If currently speaking this message, stop it
+            ttsManager.stopSpeaking()
         } else {
             // Start speaking this message
             ttsManager.speak(message.text)
@@ -669,23 +669,15 @@ struct ChatBubbleView: View {
     }
     
     private func getTTSButtonIcon(ttsManager: TextToSpeechManager) -> String {
-        if ttsManager.currentText == message.text {
-            if ttsManager.isSpeaking && !ttsManager.isPaused {
-                return "pause.fill"
-            } else if ttsManager.isPaused {
-                return "play.fill"
-            }
+        if ttsManager.currentText == message.text && ttsManager.isSpeaking {
+            return "stop.fill"
         }
         return "speaker.wave.2.fill"
     }
     
     private func getTTSButtonText(ttsManager: TextToSpeechManager) -> String {
-        if ttsManager.currentText == message.text {
-            if ttsManager.isSpeaking && !ttsManager.isPaused {
-                return "Pause"
-            } else if ttsManager.isPaused {
-                return "Resume"
-            }
+        if ttsManager.currentText == message.text && ttsManager.isSpeaking {
+            return "Stop"
         }
         return "Listen"
     }
