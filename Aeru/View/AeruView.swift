@@ -207,12 +207,18 @@ struct AeruView: View {
             Text(speechRecognitionManager.errorMessage)
         }
         .onChange(of: speechRecognitionManager.recognizedText) { oldValue, newValue in
-            if !newValue.isEmpty {
+            print("📱 AeruView: recognizedText changed from '\(oldValue)' to '\(newValue)', showVoiceConversation: \(showVoiceConversation)")
+            // Only handle STT in main view when voice conversation is not active
+            if !showVoiceConversation && !newValue.isEmpty {
                 messageText = newValue
+                print("📱 AeruView: Updated messageText to: '\(messageText)'")
             }
         }
         .onChange(of: speechRecognitionManager.isRecording) { oldValue, newValue in
-            if !newValue && !speechRecognitionManager.recognizedText.isEmpty {
+            print("📱 AeruView: isRecording changed from \(oldValue) to \(newValue), showVoiceConversation: \(showVoiceConversation)")
+            // Only handle STT cleanup in main view when voice conversation is not active
+            if !showVoiceConversation && !newValue && !speechRecognitionManager.recognizedText.isEmpty {
+                print("📱 AeruView: Clearing recognized text")
                 speechRecognitionManager.clearRecognizedText()
             }
         }
@@ -377,6 +383,8 @@ struct AeruView: View {
             Button(action: {
                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                 impactFeedback.impactOccurred()
+                // Stop any ongoing recording before opening voice conversation
+                speechRecognitionManager.stopRecording()
                 showVoiceConversation = true
             }) {
                 HStack(spacing: 8) {

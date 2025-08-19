@@ -4,8 +4,8 @@ import FoundationModels
 
 struct VoiceConversationView: View {
     let llm: LLM
-    let speechRecognitionManager: SpeechRecognitionManager
-    let textToSpeechManager: TextToSpeechManager
+    @ObservedObject var speechRecognitionManager: SpeechRecognitionManager
+    @ObservedObject var textToSpeechManager: TextToSpeechManager
     let currentSession: ChatSession
     let sessionManager: ChatSessionManager
     @Environment(\.dismiss) private var dismiss
@@ -199,40 +199,62 @@ struct VoiceConversationView: View {
             speechRecognitionManager.stopRecording()
         }
         .onChange(of: speechRecognitionManager.recognizedText) { oldValue, newValue in
+            print("🎤 VoiceConversationView: Recognized text changed from '\(oldValue)' to '\(newValue)'")
             if !newValue.isEmpty {
                 userText = newValue
+                print("🎤 VoiceConversationView: Updated userText to: '\(userText)'")
             }
         }
         .onChange(of: speechRecognitionManager.isRecording) { oldValue, newValue in
-            if !newValue && !userText.isEmpty && !hasStartedConversation {
-                // STT finished, start LLM query
-                hasStartedConversation = true
-                speechRecognitionManager.clearRecognizedText()
-                Task {
-                    await queryLLMAndSpeak()
+            print("🎤 VoiceConversationView: Recording state changed from \(oldValue) to \(newValue)")
+            print("🎤 VoiceConversationView: Current userText: '\(userText)', hasStartedConversation: \(hasStartedConversation)")
+            print("🎤 VoiceConversationView: Current recognizedText: '\(speechRecognitionManager.recognizedText)'")
+            
+            // Check if recording stopped and we have text (either in userText or recognizedText)
+            if !newValue && !hasStartedConversation {
+                let finalText = userText.isEmpty ? speechRecognitionManager.recognizedText : userText
+                if !finalText.isEmpty {
+                    print("🎤 VoiceConversationView: STT finished with text '\(finalText)', starting LLM query...")
+                    userText = finalText  // Ensure userText is set
+                    hasStartedConversation = true
+                    speechRecognitionManager.clearRecognizedText()
+                    Task {
+                        await queryLLMAndSpeak()
+                    }
+                } else {
+                    print("🎤 VoiceConversationView: STT finished but no text captured")
                 }
             }
         }
         .onReceive(llm.$userLLMResponse) { streamingResponse in
             if let response = streamingResponse {
+                print("🤖 VoiceConversationView: Received streaming response: '\(response.content.prefix(50))...'")
                 // Update AI response with streaming content
                 aiResponse = response.content
+            } else {
+                print("🤖 VoiceConversationView: Streaming response ended (nil)")
             }
         }
     }
     
     private func handleVoiceButtonTap() {
+        print("🎤 VoiceConversationView: Voice button tapped, isRecording: \(speechRecognitionManager.isRecording)")
         if speechRecognitionManager.isRecording {
+            print("🎤 VoiceConversationView: Stopping recording...")
             speechRecognitionManager.stopRecording()
         } else {
+            print("🎤 VoiceConversationView: Starting recording...")
             speechRecognitionManager.startRecording()
         }
     }
     
     private func handleTTSButtonTap() {
+        print("🔊 VoiceConversationView: TTS button tapped, isSpeaking: \(textToSpeechManager.isSpeaking)")
         if textToSpeechManager.isSpeaking {
+            print("🔊 VoiceConversationView: Toggling TTS (pause/resume)")
             textToSpeechManager.toggle()
         } else {
+            print("🔊 VoiceConversationView: Starting TTS with text: '\(aiResponse.prefix(50))...'")
             textToSpeechManager.speak(aiResponse)
         }
     }
@@ -266,6 +288,7 @@ struct VoiceConversationView: View {
     }
     
     private func resetConversation() {
+        print("🔄 VoiceConversationView: Resetting conversation")
         textToSpeechManager.stopSpeaking()
         speechRecognitionManager.stopRecording()
         userText = ""
@@ -273,21 +296,28 @@ struct VoiceConversationView: View {
         isWaitingForResponse = false
         hasStartedConversation = false
         conversationComplete = false
+        print("🔄 VoiceConversationView: Conversation reset complete")
     }
     
     @MainActor
     private func queryLLMAndSpeak() async {
-        guard !userText.isEmpty else { return }
+        guard !userText.isEmpty else { 
+            print("🤖 VoiceConversationView: queryLLMAndSpeak called but userText is empty")
+            return 
+        }
         
+        print("🤖 VoiceConversationView: Starting LLM query with text: '\(userText)'")
         isWaitingForResponse = true
         aiResponse = ""
         
         // Monitor when LLM streaming completes
         let streamingTask = Task {
+            print("🤖 VoiceConversationView: Started streaming monitoring task")
             while llm.userLLMResponse != nil {
                 try await Task.sleep(nanoseconds: 100_000_000) // Check every 0.1 seconds
             }
             
+            print("🤖 VoiceConversationView: LLM streaming completed")
             // LLM streaming has completed
             await MainActor.run {
                 isWaitingForResponse = false
@@ -295,17 +325,23 @@ struct VoiceConversationView: View {
                 
                 // Auto-start TTS when response is complete
                 if !aiResponse.isEmpty {
+                    print("🔊 VoiceConversationView: Auto-starting TTS with response: '\(aiResponse.prefix(50))...'")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         textToSpeechManager.speak(aiResponse)
                     }
+                } else {
+                    print("🔊 VoiceConversationView: No AI response to speak")
                 }
             }
         }
         
         do {
+            print("🤖 VoiceConversationView: Calling llm.queryLLMGeneral...")
             // Use queryLLMGeneral with required parameters
             try await llm.queryLLMGeneral(userText, for: currentSession, sessionManager: sessionManager)
+            print("🤖 VoiceConversationView: llm.queryLLMGeneral completed successfully")
         } catch {
+            print("🤖 VoiceConversationView: Error in LLM query: \(error)")
             streamingTask.cancel()
             aiResponse = "Sorry, I encountered an error processing your request. Please try again."
             isWaitingForResponse = false
