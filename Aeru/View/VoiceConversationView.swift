@@ -252,11 +252,8 @@ struct VoiceConversationView: View {
         }
         .onReceive(llm.$userLLMResponse) { streamingResponse in
             if let response = streamingResponse {
-                print("🤖 VoiceConversationView: Received streaming response: '\(response.content.prefix(50))...'")
                 // Update AI response with streaming content
                 aiResponse = response.content
-            } else {
-                print("🤖 VoiceConversationView: Streaming response ended (nil)")
             }
         }
     }
@@ -312,7 +309,6 @@ struct VoiceConversationView: View {
     
     // MARK: - Live Mode Functions
     private func startLiveMode() {
-        print("🎤 VoiceConversationView: Starting live mode")
         isInLiveMode = true
         conversationHistory.removeAll()
         resetCurrentExchange()
@@ -322,7 +318,6 @@ struct VoiceConversationView: View {
     }
     
     private func exitLiveMode() {
-        print("🎤 VoiceConversationView: Exiting live mode")
         isInLiveMode = false
         speechRecognitionManager.exitContinuousMode()
         textToSpeechManager.stopSpeaking()
@@ -330,7 +325,6 @@ struct VoiceConversationView: View {
     }
     
     private func startListening() {
-        print("🎤 VoiceConversationView: Starting listening in live mode")
         userText = ""
         aiResponse = ""
         
@@ -342,7 +336,6 @@ struct VoiceConversationView: View {
     }
     
     private func onVoiceInputComplete() {
-        print("🎤 VoiceConversationView: Voice input complete in live mode")
         guard isInLiveMode, !speechRecognitionManager.recognizedText.isEmpty else { return }
         
         userText = speechRecognitionManager.recognizedText
@@ -357,7 +350,6 @@ struct VoiceConversationView: View {
     private func queryLLMInLiveMode() async {
         guard !userText.isEmpty else { return }
         
-        print("🤖 VoiceConversationView: Starting LLM query in live mode with text: '\(userText)'")
         isWaitingForResponse = true
         aiResponse = ""
         
@@ -381,7 +373,6 @@ struct VoiceConversationView: View {
                 }
             }
         } catch {
-            print("🤖 VoiceConversationView: Error in live mode LLM query: \(error)")
             isWaitingForResponse = false
             aiResponse = "Sorry, I encountered an error. Please try again."
             
@@ -395,7 +386,6 @@ struct VoiceConversationView: View {
     }
     
     private func onTTSComplete() {
-        print("🔊 VoiceConversationView: TTS complete in live mode")
         guard isInLiveMode else { return }
         
         // Add the exchange to history
