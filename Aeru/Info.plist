@@ -2,14 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSAppTransportSecuritySettings</key>
-    <dict>
-        <key>NSAllowsArbitraryLoads</key>
-        <true/>
-    </dict>
-    <key>NSSpeechRecognitionUsageDescription</key>
-    <string>This app uses speech recognition to convert your voice input to text for AI conversations.</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>This app needs access to your microphone to record audio for speech-to-text conversion.</string>
+	<key>NSAppTransportSecuritySettings</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
