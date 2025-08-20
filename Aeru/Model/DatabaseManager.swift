@@ -11,6 +11,8 @@ import SQLite
 class DatabaseManager {
     static let shared = DatabaseManager()
     private var db: Connection?
+    private let jsonDecoder = JSONDecoder() // Reusable decoder to avoid initialization overhead
+    private let jsonEncoder = JSONEncoder() // Reusable encoder for consistency
     
     // Tables
     private let chatSessions = Table("chat_sessions")
@@ -258,7 +260,7 @@ class DatabaseManager {
         do {
             var sourcesString: String? = nil
             if let sources = message.sources, !sources.isEmpty {
-                let sourcesData = try JSONEncoder().encode(sources)
+                let sourcesData = try jsonEncoder.encode(sources)
                 sourcesString = String(data: sourcesData, encoding: .utf8)
             }
             
@@ -289,7 +291,7 @@ class DatabaseManager {
                 
                 if let sourcesString = row[messageSources],
                    let sourcesData = sourcesString.data(using: .utf8) {
-                    sources = try? JSONDecoder().decode([WebSearchResult].self, from: sourcesData)
+                    sources = try? jsonDecoder.decode([WebSearchResult].self, from: sourcesData)
                 }
                 
                 return ChatMessage(
