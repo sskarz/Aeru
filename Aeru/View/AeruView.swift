@@ -51,7 +51,7 @@ struct AeruView: View {
     }
 
     private var isModelResponding: Bool {
-        llm.userLLMResponse != nil || llm.isWebSearching
+        llm.isResponding || llm.isWebSearching
     }
     
     private var shouldHideNewChatButton: Bool {
@@ -335,7 +335,7 @@ struct AeruView: View {
                     }
                     
                     // Loading indicator
-                    if llm.isWebSearching && llm.userLLMResponse == nil {
+                    if llm.isWebSearching && !llm.isResponding {
                         TypingIndicatorView()
                             .id("typing")
                     }
@@ -365,7 +365,7 @@ struct AeruView: View {
                 }
             }
             .onChange(of: llm.isWebSearching) { oldValue, newValue in
-                if newValue && llm.userLLMResponse == nil {
+                if newValue && !llm.isResponding {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo("typing", anchor: .bottom)
                     }

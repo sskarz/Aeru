@@ -357,7 +357,7 @@ struct VoiceConversationView: View {
             try await llm.queryLLMGeneral(userText, for: currentSession, sessionManager: sessionManager)
             
             // Wait for streaming to complete
-            while llm.userLLMResponse != nil {
+            while llm.isResponding {
                 try await Task.sleep(nanoseconds: 100_000_000)
             }
             

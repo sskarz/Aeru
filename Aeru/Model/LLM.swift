@@ -38,6 +38,18 @@ class LLM: ObservableObject {
     private var currentSessionId: String?
     private let databaseManager = DatabaseManager.shared
     
+    // FoundationModels isResponding property
+    @Published var isResponding: Bool = false
+    
+    private func updateIsResponding() {
+        guard let currentSessionId = currentSessionId,
+              let session = sessions[currentSessionId] else {
+            isResponding = false
+            return
+        }
+        isResponding = session.isResponding
+    }
+    
     private let encoder = JSONEncoder()
     
     private func newSession(previousSession: LanguageModelSession) -> LanguageModelSession {
@@ -301,6 +313,7 @@ class LLM: ObservableObject {
         
         do {
             let responseStream = session.streamResponse(to: prompt)
+            updateIsResponding()
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
@@ -309,6 +322,7 @@ class LLM: ObservableObject {
             
             // Clear streaming response first to prevent duplicate display
             userLLMResponse = nil
+            updateIsResponding()
             
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
@@ -335,6 +349,7 @@ class LLM: ObservableObject {
             // Retry with new session
             do {
                 let responseStream = newSessionInstance.streamResponse(to: prompt)
+                updateIsResponding()
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
@@ -343,6 +358,7 @@ class LLM: ObservableObject {
                 
                 // Clear streaming response first to prevent duplicate display
                 userLLMResponse = nil
+                updateIsResponding()
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false, sources: results)
@@ -362,6 +378,7 @@ class LLM: ObservableObject {
                 }
                 
             } catch {
+                updateIsResponding()
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
                     "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
                 } else {
@@ -373,12 +390,14 @@ class LLM: ObservableObject {
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             }
         } catch LanguageModelSession.GenerationError.rateLimited {
+            updateIsResponding()
             let errorMessage = "The on-device model is currently rate limited. Please wait a moment and try again."
             
             let assistantMessage = ChatMessage(text: errorMessage, isUser: false, sources: results)
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         } catch {
+            updateIsResponding()
             // Handle errors including guardrail violations
             let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
                 "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
@@ -414,10 +433,12 @@ class LLM: ObservableObject {
         
         do {
             let responseStream = session.streamResponse(to: titlePrompt)
+            updateIsResponding()
             var fullResponse = ""
             for try await partialStream in responseStream {
                 fullResponse = partialStream.content
             }
+            updateIsResponding()
             
             let cleanTitle = fullResponse
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -475,6 +496,7 @@ class LLM: ObservableObject {
         
         do {
             let responseStream = session.streamResponse(to: prompt)
+            updateIsResponding()
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
@@ -483,6 +505,7 @@ class LLM: ObservableObject {
             
             // Clear streaming response first to prevent duplicate display
             userLLMResponse = nil
+            updateIsResponding()
             
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
@@ -509,6 +532,7 @@ class LLM: ObservableObject {
             // Retry with new session
             do {
                 let responseStream = newSessionInstance.streamResponse(to: prompt)
+                updateIsResponding()
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
@@ -517,6 +541,7 @@ class LLM: ObservableObject {
                 
                 // Clear streaming response first to prevent duplicate display
                 userLLMResponse = nil
+                updateIsResponding()
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
@@ -536,6 +561,7 @@ class LLM: ObservableObject {
                 }
                 
             } catch {
+                updateIsResponding()
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
                     "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
                 } else {
@@ -547,6 +573,7 @@ class LLM: ObservableObject {
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             }
         } catch LanguageModelSession.GenerationError.rateLimited {
+            updateIsResponding()
             let errorMessage = "The on-device model is currently rate limited. Please wait a moment and try again."
             
             let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
@@ -601,6 +628,7 @@ class LLM: ObservableObject {
         
         do {
             let responseStream = session.streamResponse(to: prompt)
+            updateIsResponding()
             var fullResponse = ""
             for try await partialStream in responseStream {
                 userLLMResponse = partialStream
@@ -609,6 +637,7 @@ class LLM: ObservableObject {
             
             // Clear streaming response first to prevent duplicate display
             userLLMResponse = nil
+            updateIsResponding()
             
             // Save assistant message
             let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
@@ -635,6 +664,7 @@ class LLM: ObservableObject {
             // Retry with new session
             do {
                 let responseStream = newSessionInstance.streamResponse(to: prompt)
+                updateIsResponding()
                 var fullResponse = ""
                 for try await partialStream in responseStream {
                     userLLMResponse = partialStream
@@ -643,6 +673,7 @@ class LLM: ObservableObject {
                 
                 // Clear streaming response first to prevent duplicate display
                 userLLMResponse = nil
+                updateIsResponding()
                 
                 // Save assistant message
                 let assistantMessage = ChatMessage(text: fullResponse, isUser: false)
@@ -662,6 +693,7 @@ class LLM: ObservableObject {
                 }
                 
             } catch {
+                updateIsResponding()
                 let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
                     "Sorry, I cannot provide a response to that query due to Apple's safety guidelines. Please try rephrasing your question."
                 } else {
@@ -673,6 +705,7 @@ class LLM: ObservableObject {
                 databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
             }
         } catch LanguageModelSession.GenerationError.rateLimited {
+            updateIsResponding()
             let errorMessage = "The on-device model is currently rate limited. Please wait a moment and try again."
             
             let assistantMessage = ChatMessage(text: errorMessage, isUser: false)
