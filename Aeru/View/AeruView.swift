@@ -406,32 +406,6 @@ struct AeruView: View {
     
     private var inputView: some View {
         VStack(spacing: 12) {
-            // Voice conversation button
-            Button(action: {
-                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                impactFeedback.impactOccurred()
-                // Stop any ongoing recording before opening voice conversation
-                speechRecognitionManager.stopRecording()
-                showVoiceConversation = true
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "mic.and.signal.meter")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Voice Conversation")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-                .foregroundColor(.blue)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.blue, lineWidth: 1)
-                        .background(Color.blue.opacity(0.05))
-                )
-            }
-            .disabled(isModelResponding)
-            
             // Upload button, text input, voice button and send button
             HStack(spacing: 12) {
                 // Document upload button
@@ -482,25 +456,46 @@ struct AeruView: View {
                 .disabled(isModelResponding)
                 .glassEffect(.regular.interactive())
                 
-                Button(action: {
-                    if !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isModelResponding {
+                // Send button OR Voice Conversation button based on text content
+                if messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    // Voice Conversation button when no text
+                    Button(action: {
                         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                         impactFeedback.impactOccurred()
+                        // Stop any ongoing recording before opening voice conversation
+                        speechRecognitionManager.stopRecording()
+                        showVoiceConversation = true
+                    }) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                            )
                     }
-                    sendMessage()
-                }) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding ? 
-                                      Color.gray.opacity(0.6) : Color.blue)
-                        )
+                    .disabled(isModelResponding)
+                    .glassEffect(.regular.interactive())
+                } else {
+                    // Send button when there is text
+                    Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        sendMessage()
+                    }) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                            )
+                    }
+                    .disabled(isModelResponding)
+                    .glassEffect(.regular.interactive())
                 }
-                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding)
-                .glassEffect(.regular.interactive())
             }
             
         }
