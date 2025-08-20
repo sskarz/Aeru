@@ -38,6 +38,7 @@ struct AeruView: View {
     @State private var showConnectivityAlert: Bool = false
     @State private var showSources: Bool = false
     @State private var sourcesToShow: [WebSearchResult] = []
+    @State private var sourcesLoading: Bool = false
     @State private var showVoiceConversation: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
@@ -176,9 +177,9 @@ struct AeruView: View {
             }
         }
         .sheet(isPresented: $showSources) {
-            SourcesView(sources: sourcesToShow) { url in
+            SourcesView(sources: sourcesToShow, onLinkTap: { url in
                 webBrowserURL = BrowserURL(url: url)
-            }
+            }, isLoading: sourcesLoading)
         }
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
@@ -294,8 +295,20 @@ struct AeruView: View {
                         ChatBubbleView(message: message, onLinkTap: { url in
                             webBrowserURL = BrowserURL(url: url)
                         }, onSourcesTap: { sources in
-                            sourcesToShow = sources
+                            // Set loading state first
+                            sourcesLoading = true
+                            sourcesToShow = []
                             showSources = true
+                            
+                            // Show loading briefly then display sources
+                            Task {
+                                // Small delay to show loading indicator
+                                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second
+                                await MainActor.run {
+                                    sourcesToShow = sources
+                                    sourcesLoading = false
+                                }
+                            }
                         }, textToSpeechManager: textToSpeechManager)
                         .id(message.id)
                     }
@@ -305,8 +318,20 @@ struct AeruView: View {
                         ChatBubbleView(message: ChatMessage(text: streamingResponse.content, isUser: false), onLinkTap: { url in
                             webBrowserURL = BrowserURL(url: url)
                         }, onSourcesTap: { sources in
-                            sourcesToShow = sources
+                            // Set loading state first
+                            sourcesLoading = true
+                            sourcesToShow = []
                             showSources = true
+                            
+                            // Show loading briefly then display sources
+                            Task {
+                                // Small delay to show loading indicator
+                                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second
+                                await MainActor.run {
+                                    sourcesToShow = sources
+                                    sourcesLoading = false
+                                }
+                            }
                         }, textToSpeechManager: textToSpeechManager)
                         .id("streaming")
                     }
@@ -724,13 +749,26 @@ struct TypingIndicatorView: View {
 struct SourcesView: View {
     let sources: [WebSearchResult]
     let onLinkTap: ((String) -> Void)?
+    let isLoading: Bool
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationView {
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
+                    if isLoading && sources.isEmpty {
+                        // Loading state
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text("Loading sources...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.top, 100)
+                    } else {
+                        ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "link")
@@ -787,6 +825,7 @@ struct SourcesView: View {
                                 Label("Open Link", systemImage: "safari")
                             }
                         }
+                    }
                     }
                 }
                 .padding(.horizontal, 16)
