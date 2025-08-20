@@ -180,6 +180,8 @@ struct AeruView: View {
             SourcesView(sources: sourcesToShow, onLinkTap: { url in
                 webBrowserURL = BrowserURL(url: url)
             }, isLoading: sourcesLoading)
+                .presentationDetents([.fraction(0.5)])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
