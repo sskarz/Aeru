@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import FoundationModels
+import MarkdownUI
 
 struct VoiceConversationView: View {
     let llm: LLM
@@ -69,8 +70,8 @@ struct VoiceConversationView: View {
                                         HStack {
                                             Image(systemName: "brain.head.profile")
                                                 .foregroundColor(.purple)
-                                            Text(exchange.ai)
-                                                .font(.body)
+                                            Markdown(exchange.ai)
+                                                .textSelection(.enabled)
                                         }
                                         .padding(12)
                                         .background(
@@ -119,8 +120,8 @@ struct VoiceConversationView: View {
                                                         .foregroundColor(.secondary)
                                                 }
                                             } else {
-                                                Text(aiResponse)
-                                                    .font(.body)
+                                                Markdown(aiResponse)
+                                                    .textSelection(.enabled)
                                             }
                                         }
                                         .padding(12)
@@ -135,8 +136,44 @@ struct VoiceConversationView: View {
                         .padding(.horizontal, 20)
                     }
                     .onChange(of: conversationHistory.count) { _, _ in
-                        withAnimation {
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             proxy.scrollTo("current", anchor: .bottom)
+                        }
+                    }
+                    .onChange(of: userText) { _, _ in
+                        // Scroll when user text changes
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo("current", anchor: .bottom)
+                        }
+                    }
+                    .onChange(of: aiResponse) { _, _ in
+                        // Scroll when AI response updates
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo("current", anchor: .bottom)
+                        }
+                    }
+                    .onChange(of: speechRecognitionManager.isRecording) { _, newValue in
+                        // Scroll when recording state changes
+                        if newValue {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo("current", anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: isWaitingForResponse) { _, newValue in
+                        // Scroll when waiting state changes
+                        if newValue {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo("current", anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: textToSpeechManager.isSpeaking) { _, newValue in
+                        // Scroll when TTS state changes
+                        if newValue {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo("current", anchor: .bottom)
+                            }
                         }
                     }
                 }
