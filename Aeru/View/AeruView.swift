@@ -462,9 +462,9 @@ struct AeruView: View {
                     Button(action: {
                         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                         impactFeedback.impactOccurred()
-                        // Stop any ongoing recording before opening voice conversation
+                        // Stop any ongoing recording and start live voice conversation immediately
                         speechRecognitionManager.stopRecording()
-                        showVoiceConversation = true
+                        startInstantVoiceConversation()
                     }) {
                         Image(systemName: "waveform")
                             .font(.system(size: 16, weight: .medium))
@@ -510,6 +510,19 @@ struct AeruView: View {
         } else {
             isMessageFieldFocused = false
             speechRecognitionManager.startRecording()
+        }
+    }
+    
+    private func startInstantVoiceConversation() {
+        // Dismiss keyboard
+        isMessageFieldFocused = false
+        
+        // Show voice conversation modal and start live mode immediately
+        showVoiceConversation = true
+        
+        // Small delay to ensure modal is presented before starting live mode
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // The VoiceConversationView will auto-start live mode on appear
         }
     }
     

@@ -200,6 +200,14 @@ struct VoiceConversationView: View {
                 }
             }
         }
+        .onAppear {
+            // Auto-start live mode when view appears
+            if !isInLiveMode {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    startLiveMode()
+                }
+            }
+        }
         .onDisappear {
             exitLiveMode()
             textToSpeechManager.stopSpeaking()
