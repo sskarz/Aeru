@@ -13,6 +13,7 @@ import WebKit
 import UIKit
 import MarkdownUI
 import FoundationModels
+import Speech
 
 
 struct BrowserURL: Identifiable {
@@ -24,6 +25,9 @@ struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
     @StateObject private var networkConnectivity = NetworkConnectivity()
+    @StateObject private var speechRecognitionManager = SpeechRecognitionManager()
+    @StateObject private var textToSpeechManager = TextToSpeechManager()
+    @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     
     @State private var messageText: String = ""
     // useWebSearch is now per-session, computed from currentSession
@@ -32,6 +36,10 @@ struct AeruView: View {
     @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
     @State private var showConnectivityAlert: Bool = false
+    @State private var showSources: Bool = false
+    @State private var sourcesToShow: [WebSearchResult] = []
+    @State private var sourcesLoading: Bool = false
+    @State private var showVoiceConversation: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
     // Sidebar animation properties
@@ -43,14 +51,11 @@ struct AeruView: View {
     }
 
     private var isModelResponding: Bool {
-        llm.userLLMResponse != nil || llm.isWebSearching
+        llm.isResponding || llm.isWebSearching
     }
     
-    private var shouldDisableNewChatButton: Bool {
-        // Enable if no sessions exist (user needs a way to create first chat)
-        guard !sessionManager.sessions.isEmpty else { return false }
-        
-        // Disable if current chat is empty (new chat with 0 messages) or model is responding
+    private var shouldHideNewChatButton: Bool {
+        // Hide if current chat is empty (new chat with 0 messages) or model is responding
         return llm.chatMessages.isEmpty || isModelResponding
     }
     
@@ -59,20 +64,9 @@ struct AeruView: View {
     }
     
     private func handleNewChatCreation() {
-        let result = sessionManager.createNewSession(title: "")
-        switch result {
-        case .success(_):
-            // Successfully created new chat
-            break
-        case .duplicateUntitled:
-            // Redirect to existing new chat instead of showing alert
-            if let existingNewChat = sessionManager.sessions.first(where: { $0.title.isEmpty }) {
-                sessionManager.selectSession(existingNewChat)
-            }
-        case .duplicateTitle, .databaseError:
-            // Handle other errors if needed
-            break
-        }
+        // Stop any ongoing TTS when starting a new chat
+        textToSpeechManager.stopSpeaking()
+        _ = sessionManager.getOrCreateNewChat()
     }
     
     var body: some View {
@@ -104,6 +98,8 @@ struct AeruView: View {
                     Color.black.opacity(getOverlayOpacity())
                         .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: showSidebar)
                         .onTapGesture {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
                             withAnimation {
                                 showSidebar = false
                             }
@@ -112,7 +108,7 @@ struct AeruView: View {
                 )
                 
                 // Sidebar
-                ChatSidebar(sessionManager: sessionManager, shouldDisableNewChatButton: shouldDisableNewChatButton)
+                ChatSidebar(sessionManager: sessionManager)
                     .frame(width: sidebarWidth)
                     .offset(x: -sidebarWidth)
                     .offset(x: max(offset + gestureOffset, 0))
@@ -153,9 +149,9 @@ struct AeruView: View {
                     sessionManager.loadSessions()
                 }
                 
-                // Only create a new session if none exist after loading
-                if sessionManager.sessions.isEmpty {
-                    _ = sessionManager.createNewSession()
+                // Always ensure there's a current session (empty chat)
+                if sessionManager.currentSession == nil {
+                    _ = sessionManager.getOrCreateNewChat()
                 }
                 
                 if let currentSession = sessionManager.currentSession {
@@ -164,6 +160,11 @@ struct AeruView: View {
             }
         }
         .onChange(of: sessionManager.currentSession) { oldValue, newValue in
+            // Stop TTS when switching to a different chat session
+            if oldValue?.id != newValue?.id {
+                textToSpeechManager.stopSpeaking()
+            }
+            
             if let session = newValue {
                 llm.switchToSession(session)
             }
@@ -175,14 +176,55 @@ struct AeruView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+        .sheet(isPresented: $showSources) {
+            SourcesView(sources: sourcesToShow, onLinkTap: { url in
+                webBrowserURL = BrowserURL(url: url)
+            }, isLoading: sourcesLoading)
+                .presentationDetents([.fraction(0.5)])
+                .presentationDragIndicator(.visible)
+        }
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
+        }
+        .sheet(isPresented: $showVoiceConversation) {
+            if let currentSession = sessionManager.currentSession {
+                VoiceConversationView(
+                    llm: llm,
+                    speechRecognitionManager: speechRecognitionManager,
+                    textToSpeechManager: textToSpeechManager,
+                    currentSession: currentSession,
+                    sessionManager: sessionManager
+                )
+            }
         }
         .alert("No Internet Connection", isPresented: $showConnectivityAlert) {
             Button("OK") { }
         } message: {
             Text("Please turn on cellular or WiFi to use web search functionality.")
         }
+        .alert("Speech Recognition Error", isPresented: $speechRecognitionManager.hasError) {
+            Button("OK") { 
+                speechRecognitionManager.clearError()
+            }
+        } message: {
+            Text(speechRecognitionManager.errorMessage)
+        }
+        .onChange(of: speechRecognitionManager.recognizedText) { oldValue, newValue in
+            // Only handle STT in main view when voice conversation is not active
+            if !showVoiceConversation && !newValue.isEmpty {
+                messageText = newValue
+            }
+        }
+        .onChange(of: speechRecognitionManager.isRecording) { oldValue, newValue in
+            // Only handle STT cleanup in main view when voice conversation is not active
+            if !showVoiceConversation && !newValue && !speechRecognitionManager.recognizedText.isEmpty {
+                speechRecognitionManager.clearRecognizedText()
+            }
+        }
+        .onDisappear {
+            textToSpeechManager.stopSpeaking()
+        }
+        .preferredColorScheme(AppColorScheme(rawValue: selectedColorScheme)?.colorScheme)
     }
     
     private var headerView: some View {
@@ -190,6 +232,8 @@ struct AeruView: View {
             HStack(spacing: 16) {
                 // Sidebar toggle
                 Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
                     isMessageFieldFocused = false
                     showSidebar.toggle()
                 }) {
@@ -208,14 +252,23 @@ struct AeruView: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                // New chat button
-                Button(action: handleNewChatCreation) {
-                    Image(systemName: "plus.message")
-                        .font(.title3)
-                        .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
+                // New chat button - disappears when unavailable
+                if !shouldHideNewChatButton {
+                    Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        handleNewChatCreation()
+                    }) {
+                        Image(systemName: "plus.message")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                            .frame(width: 24, height: 24)
+                    }
+                } else {
+                    // Empty spacer to maintain layout balance
+                    Spacer()
                         .frame(width: 24, height: 24)
                 }
-                .disabled(shouldDisableNewChatButton)
                 
             }
             .padding(.horizontal, 16)
@@ -237,22 +290,52 @@ struct AeruView: View {
                     }
                     
                     ForEach(llm.chatMessages) { message in
-                        ChatBubbleView(message: message) { url in
+                        ChatBubbleView(message: message, onLinkTap: { url in
                             webBrowserURL = BrowserURL(url: url)
-                        }
+                        }, onSourcesTap: { sources in
+                            // Set loading state first
+                            sourcesLoading = true
+                            sourcesToShow = []
+                            showSources = true
+                            
+                            // Show loading briefly then display sources
+                            Task {
+                                // Small delay to show loading indicator
+                                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second
+                                await MainActor.run {
+                                    sourcesToShow = sources
+                                    sourcesLoading = false
+                                }
+                            }
+                        }, textToSpeechManager: textToSpeechManager)
                         .id(message.id)
                     }
                     
                     // Streaming response display
                     if let streamingResponse = llm.userLLMResponse {
-                        ChatBubbleView(message: ChatMessage(text: streamingResponse.content, isUser: false)) { url in
+                        ChatBubbleView(message: ChatMessage(text: streamingResponse.content, isUser: false), onLinkTap: { url in
                             webBrowserURL = BrowserURL(url: url)
-                        }
+                        }, onSourcesTap: { sources in
+                            // Set loading state first
+                            sourcesLoading = true
+                            sourcesToShow = []
+                            showSources = true
+                            
+                            // Show loading briefly then display sources
+                            Task {
+                                // Small delay to show loading indicator
+                                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second
+                                await MainActor.run {
+                                    sourcesToShow = sources
+                                    sourcesLoading = false
+                                }
+                            }
+                        }, textToSpeechManager: textToSpeechManager)
                         .id("streaming")
                     }
                     
                     // Loading indicator
-                    if llm.isWebSearching && llm.userLLMResponse == nil {
+                    if llm.isWebSearching && !llm.isResponding {
                         TypingIndicatorView()
                             .id("typing")
                     }
@@ -282,7 +365,7 @@ struct AeruView: View {
                 }
             }
             .onChange(of: llm.isWebSearching) { oldValue, newValue in
-                if newValue && llm.userLLMResponse == nil {
+                if newValue && !llm.isResponding {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo("typing", anchor: .bottom)
                     }
@@ -319,10 +402,14 @@ struct AeruView: View {
     
     private var inputView: some View {
         VStack(spacing: 12) {
-            // Upload button, text input and send button
+            // Upload button, text input, voice button and send button
             HStack(spacing: 12) {
                 // Document upload button
-                Button(action: { showKnowledgeBase.toggle() }) {
+                Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    showKnowledgeBase.toggle() 
+                }) {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
@@ -346,25 +433,93 @@ struct AeruView: View {
                     .disableAutocorrection(false)
                     .glassEffect(.regular.interactive())
                 
-                Button(action: sendMessage) {
-                    Image(systemName: "arrow.up")
+                // Voice input button
+                Button(action: {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    handleVoiceButtonTap()
+                }) {
+                    Image(systemName: speechRecognitionManager.isRecording ? "mic.fill" : "mic")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(speechRecognitionManager.isRecording ? .red : .blue)
                         .frame(width: 40, height: 40)
                         .background(
                             Circle()
-                                .fill(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding ? 
-                                      Color.gray.opacity(0.6) : Color.blue)
+                                .fill(speechRecognitionManager.isRecording ? 
+                                      Color.red.opacity(0.1) : Color(.systemGray6))
                         )
                 }
-                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isModelResponding)
+                .disabled(isModelResponding)
                 .glassEffect(.regular.interactive())
+                
+                // Send button OR Voice Conversation button based on text content
+                if messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    // Voice Conversation button when no text
+                    Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        // Stop any ongoing recording and start live voice conversation immediately
+                        speechRecognitionManager.stopRecording()
+                        startInstantVoiceConversation()
+                    }) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                            )
+                    }
+                    .disabled(isModelResponding)
+                    .glassEffect(.regular.interactive())
+                } else {
+                    // Send button when there is text
+                    Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        sendMessage()
+                    }) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                            )
+                    }
+                    .disabled(isModelResponding)
+                    .glassEffect(.regular.interactive())
+                }
             }
             
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(Color(.systemBackground))
+    }
+    
+    private func handleVoiceButtonTap() {
+        if speechRecognitionManager.isRecording {
+            speechRecognitionManager.stopRecording()
+        } else {
+            isMessageFieldFocused = false
+            speechRecognitionManager.startRecording()
+        }
+    }
+    
+    private func startInstantVoiceConversation() {
+        // Dismiss keyboard
+        isMessageFieldFocused = false
+        
+        // Show voice conversation modal and start live mode immediately
+        showVoiceConversation = true
+        
+        // Small delay to ensure modal is presented before starting live mode
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // The VoiceConversationView will auto-start live mode on appear
+        }
     }
     
     private func sendMessage() {
@@ -376,6 +531,9 @@ struct AeruView: View {
             showConnectivityAlert = true
             return
         }
+        
+        // Stop any ongoing TTS when sending a new message
+        textToSpeechManager.stopSpeaking()
         
         // Clear input
         messageText = ""
@@ -401,20 +559,21 @@ struct AeruView: View {
         // Use a lower threshold for iOS 26 compatibility
         let threshold = sidebarWidth * 0.3
         
+        let willToggleSidebar: Bool
         if showSidebar {
             // Sidebar is open - check if should close
-            if translation < -threshold || velocity < -500 {
-                showSidebar = false
-            } else {
-                showSidebar = true // Keep open
-            }
+            willToggleSidebar = translation < -threshold || velocity < -500
+            showSidebar = !willToggleSidebar
         } else {
             // Sidebar is closed - check if should open
-            if translation > threshold || velocity > 500 {
-                showSidebar = true
-            } else {
-                showSidebar = false // Keep closed
-            }
+            willToggleSidebar = translation > threshold || velocity > 500
+            showSidebar = willToggleSidebar
+        }
+        
+        // Add haptic feedback for successful swipe gestures
+        if willToggleSidebar {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
         }
     }
     
@@ -427,10 +586,14 @@ struct AeruView: View {
 struct ChatBubbleView: View {
     let message: ChatMessage
     let onLinkTap: ((String) -> Void)?
+    let onSourcesTap: (([WebSearchResult]) -> Void)?
+    let textToSpeechManager: TextToSpeechManager?
     
-    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil) {
+    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil, textToSpeechManager: TextToSpeechManager? = nil) {
         self.message = message
         self.onLinkTap = onLinkTap
+        self.onSourcesTap = onSourcesTap
+        self.textToSpeechManager = textToSpeechManager
     }
     
     var body: some View {
@@ -462,53 +625,61 @@ struct ChatBubbleView: View {
                         .foregroundColor(.primary)
                 }
                 
-                // Web sources
-                if let sources = message.sources, !sources.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sources:")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)  
-                        
-                        ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
+                // Action buttons for AI responses
+                if !message.isUser {
+                    HStack(spacing: 8) {
+                        // Text-to-Speech button
+                        if let ttsManager = textToSpeechManager {
                             Button(action: {
-                                onLinkTap?(source.url)
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                handleTTSButtonTap(ttsManager: ttsManager)
                             }) {
-                                HStack(alignment: .top, spacing: 4) {
-                                    Text("•")
+                                HStack(spacing: 4) {
+                                    Image(systemName: getTTSButtonIcon(ttsManager: ttsManager))
                                         .font(.caption2)
                                         .foregroundColor(.blue)
-                                    Text(source.title)
+                                    Text(getTTSButtonText(ttsManager: ttsManager))
                                         .font(.caption2)
+                                        .fontWeight(.medium)
                                         .foregroundColor(.blue)
-                                        .lineLimit(1)
-                                        .multilineTextAlignment(.leading)
                                 }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color.blue.opacity(0.1))
+                                )
                             }
                             .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contextMenu {
-                                Button(action: {
-                                    copyToClipboard(source.url)
-                                }) {
-                                    Label("Copy Link", systemImage: "doc.on.clipboard")
+                        }
+                        
+                        // Sources button
+                        if let sources = message.sources, !sources.isEmpty {
+                            Button(action: {
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                onSourcesTap?(sources)
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "link")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                    Text("Sources (\(sources.count))")
+                                        .font(.caption2)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.blue)
                                 }
-                                
-                                Button(action: {
-                                    onLinkTap?(source.url)
-                                }) {
-                                    Label("Open Link", systemImage: "safari")
-                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color.blue.opacity(0.1))
+                                )
                             }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue.opacity(0.1))
-                    )
                 }
             }
             
@@ -516,6 +687,30 @@ struct ChatBubbleView: View {
                 Spacer(minLength: 50)
             }
         }
+    }
+    
+    private func handleTTSButtonTap(ttsManager: TextToSpeechManager) {
+        if ttsManager.isSpeaking && ttsManager.currentText == message.text {
+            // If currently speaking this message, stop it
+            ttsManager.stopSpeaking()
+        } else {
+            // Start speaking this message
+            ttsManager.speak(message.text)
+        }
+    }
+    
+    private func getTTSButtonIcon(ttsManager: TextToSpeechManager) -> String {
+        if ttsManager.currentText == message.text && ttsManager.isSpeaking {
+            return "stop.fill"
+        }
+        return "speaker.wave.2.fill"
+    }
+    
+    private func getTTSButtonText(ttsManager: TextToSpeechManager) -> String {
+        if ttsManager.currentText == message.text && ttsManager.isSpeaking {
+            return "Stop"
+        }
+        return "Listen"
     }
     
     private func copyToClipboard(_ text: String) {
@@ -557,6 +752,108 @@ struct TypingIndicatorView: View {
     }
 }
 
+struct SourcesView: View {
+    let sources: [WebSearchResult]
+    let onLinkTap: ((String) -> Void)?
+    let isLoading: Bool
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if isLoading && sources.isEmpty {
+                        // Loading state
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text("Loading sources...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.top, 100)
+                    } else {
+                        ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "link")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                Text("\(index + 1).")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            
+                            Text(source.title)
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Text(source.url)
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            if !source.content.isEmpty {
+                                Text(source.content)
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(3)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .onTapGesture {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            onLinkTap?(source.url)
+                            dismiss()
+                        }
+                        .contextMenu {
+                            Button(action: {
+                                copyToClipboard(source.url)
+                            }) {
+                                Label("Copy Link", systemImage: "doc.on.clipboard")
+                            }
+                            
+                            Button(action: {
+                                onLinkTap?(source.url)
+                                dismiss()
+                            }) {
+                                Label("Open Link", systemImage: "safari")
+                            }
+                        }
+                    }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .navigationTitle("Sources")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        UIPasteboard.general.string = text
+    }
+}
+
 struct KnowledgeBaseView: View {
     let llm: LLM
     let session: ChatSession
@@ -576,7 +873,11 @@ struct KnowledgeBaseView: View {
         NavigationView {
             VStack(spacing: 16) {
                 
-                Button(action: { showDocumentPicker = true }) {
+                Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    showDocumentPicker = true 
+                }) {
                     HStack {
                         Image(systemName: "doc.badge.plus")
                         Text("Upload PDF Document")
@@ -600,6 +901,8 @@ struct KnowledgeBaseView: View {
                 }
                 
                 Button(action: {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
                     sessionManager.updateSessionWebSearch(session, useWebSearch: !useWebSearch)
                 }) {
                     HStack {
@@ -793,6 +1096,9 @@ struct WebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         self.webView = webView
         
+        // Initialize the coordinator with the current URL
+        context.coordinator.lastLoadedURL = url
+        
         if let validURL = URL(string: url) {
             let request = URLRequest(url: validURL)
             webView.load(request)
@@ -802,11 +1108,14 @@ struct WebView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        guard let currentURL = uiView.url?.absoluteString, currentURL != url else { return }
-        
-        if let validURL = URL(string: url) {
-            let request = URLRequest(url: validURL)
-            uiView.load(request)
+        // Only load if this is a different URL than what we last loaded
+        // This prevents infinite reload loops
+        if url != context.coordinator.lastLoadedURL {
+            context.coordinator.lastLoadedURL = url
+            if let validURL = URL(string: url) {
+                let request = URLRequest(url: validURL)
+                uiView.load(request)
+            }
         }
     }
     
@@ -816,6 +1125,7 @@ struct WebView: UIViewRepresentable {
     
     class Coordinator: NSObject, WKNavigationDelegate {
         let parent: WebView
+        var lastLoadedURL: String = ""
         
         init(_ parent: WebView) {
             self.parent = parent

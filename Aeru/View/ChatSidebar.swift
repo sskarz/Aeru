@@ -11,7 +11,6 @@ import Foundation
 
 struct ChatSidebar: View {
     @ObservedObject var sessionManager: ChatSessionManager
-    let shouldDisableNewChatButton: Bool
     @State private var editingSession: ChatSession?
     @State private var editTitle = ""
     @State private var showingDuplicateTitleAlert = false
@@ -28,6 +27,8 @@ struct ChatSidebar: View {
                 HStack {
                     if isSelectionMode {
                         Button("Cancel") {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
                             isSelectionMode = false
                             selectedSessions.removeAll()
                         }
@@ -42,7 +43,11 @@ struct ChatSidebar: View {
                         
                         Spacer()
                         
-                        Button(action: { showingBulkDeleteAlert = true }) {
+                        Button(action: { 
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            showingBulkDeleteAlert = true 
+                        }) {
                             Image(systemName: "trash")
                                 .font(.title3)
                                 .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
@@ -56,14 +61,15 @@ struct ChatSidebar: View {
                         Spacer()
                         
                         Button(action: { 
-                            _ = sessionManager.createNewSession(title: "")
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            _ = sessionManager.getOrCreateNewChat()
                         }) {
                             Image(systemName: "plus.message")
                                 .font(.title3)
-                                .foregroundColor(shouldDisableNewChatButton ? .gray : .blue)
+                                .foregroundColor(.blue)
                                 .frame(width: 24, height: 24)
                         }
-                        .disabled(shouldDisableNewChatButton)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -75,7 +81,7 @@ struct ChatSidebar: View {
             // Chat sessions list
             ScrollView {
                 LazyVStack(spacing: 6) {
-                    ForEach(sessionManager.sessions) { session in
+                    ForEach(sessionManager.displayedSessions) { session in
                         ChatSessionRow(
                             session: session,
                             isSelected: sessionManager.currentSession?.id == session.id,
@@ -83,12 +89,16 @@ struct ChatSidebar: View {
                             isChecked: selectedSessions.contains(session.id),
                             onSelect: {
                                 if isSelectionMode {
+                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                    impactFeedback.impactOccurred()
                                     if selectedSessions.contains(session.id) {
                                         selectedSessions.remove(session.id)
                                     } else {
                                         selectedSessions.insert(session.id)
                                     }
                                 } else {
+                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                    impactFeedback.impactOccurred()
                                     sessionManager.selectSession(session)
                                 }
                             },
@@ -112,7 +122,11 @@ struct ChatSidebar: View {
                 Divider()
                 
                 HStack {
-                    Button(action: { showingSettings = true }) {
+                    Button(action: { 
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        showingSettings = true 
+                    }) {
                         HStack {
                             Image(systemName: "gear")
                                 .font(.title3)
@@ -128,6 +142,8 @@ struct ChatSidebar: View {
                     Spacer()
                     
                     Button(action: { 
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
                         isSelectionMode = true 
                     }) {
                         Image(systemName: "checkmark.circle")
@@ -256,6 +272,8 @@ struct ChatSessionRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if !isSelectionMode {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
                 onSelect()
             }
         }
@@ -270,107 +288,3 @@ struct ChatSessionRow: View {
     }
 }
 
-struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                VStack(spacing: 16) {
-                    // App Info Section
-                    VStack(spacing: 8) {
-                        Text("Aeru")
-                            .font(.title)
-                            .fontWeight(.bold)
-                        
-                        Text("AI Chat Assistant")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 20)
-                }
-                
-                // Links Section
-                VStack(spacing: 16) {
-                    Text("Community & Support")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    VStack(spacing: 12) {
-                        // GitHub Link
-                        Button(action: {
-                            // You can fill in the GitHub URL here
-                            if let url = URL(string: "https://github.com/sskarz/Aeru") {
-                                UIApplication.shared.open(url)
-                            }
-                        }) {
-                            HStack {
-                                Image("github-logo") // You'll add this to Assets
-                                    .resizable()
-                                    .frame(width: 24, height: 24)
-                                    .foregroundColor(.primary)
-                                
-                                Text("GitHub")
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        // Discord Link
-                        Button(action: {
-                            // You can fill in the Discord URL here
-                            if let url = URL(string: "https://discord.gg/mZY5fHXZ") {
-                                UIApplication.shared.open(url)
-                            }
-                        }) {
-                            HStack {
-                                Image("discord-logo") // You'll add this to Assets
-                                    .resizable()
-                                    .frame(width: 24, height: 24)
-                                    .foregroundColor(.primary)
-                                
-                                Text("Discord")
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 20)
-                
-                Spacer()
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
