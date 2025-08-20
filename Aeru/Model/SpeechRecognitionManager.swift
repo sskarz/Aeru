@@ -19,7 +19,7 @@ class SpeechRecognitionManager: ObservableObject {
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private var silenceTimer: Timer?
     private var lastSpeechTime: Date?
-    private let silenceThreshold: TimeInterval = 3.0 // 3 seconds of silence
+    private let silenceThreshold: TimeInterval = 1.5 // 1.5 seconds of silence
     private var onAutoStop: (() -> Void)?
     private var audioPlayer: AVAudioPlayer?
     
