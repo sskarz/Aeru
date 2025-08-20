@@ -580,6 +580,7 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         } catch {
+            updateIsResponding()
             // Handle errors including guardrail violations
             let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
                 "Sorry, I cannot provide a response to that query due to safety guidelines. Please try rephrasing your question."
@@ -712,6 +713,7 @@ class LLM: ObservableObject {
             chatMessages.append(assistantMessage)
             databaseManager.saveMessage(assistantMessage, sessionId: sessionId)
         } catch {
+            updateIsResponding()
             // Handle errors including guardrail violations
             let errorMessage = if error.localizedDescription.contains("GenerationError error 2") {
                 "Sorry, I cannot provide a response to that query due to Apple's safety guidelines. Please try rephrasing your question."
