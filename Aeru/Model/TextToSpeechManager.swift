@@ -12,6 +12,7 @@ class TextToSpeechManager: NSObject, ObservableObject {
     
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var currentUtterance: AVSpeechUtterance?
+    private var completionHandler: (() -> Void)?
     
     override init() {
         super.init()
@@ -43,12 +44,17 @@ class TextToSpeechManager: NSObject, ObservableObject {
     }
     
     func speak(_ text: String) {
+        speak(text, completion: nil)
+    }
+    
+    func speak(_ text: String, completion: (() -> Void)?) {
         guard !text.isEmpty else { return }
         
         // Stop any current speech
         stopSpeaking()
         
         currentText = text
+        completionHandler = completion
         
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = selectedVoice
@@ -74,6 +80,7 @@ class TextToSpeechManager: NSObject, ObservableObject {
         speechSynthesizer.stopSpeaking(at: .immediate)
         currentUtterance = nil
         currentText = ""
+        completionHandler = nil
     }
     
     func setSpeechRate(_ rate: Float) {
@@ -112,12 +119,19 @@ extension TextToSpeechManager: AVSpeechSynthesizerDelegate {
             currentText = ""
             currentUtterance = nil
             
+            // Call completion handler
+            let completion = completionHandler
+            completionHandler = nil
+            
             // Deactivate audio session
             do {
                 try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             } catch {
                 print("Failed to deactivate audio session: \(error)")
             }
+            
+            // Call completion after audio session cleanup
+            completion?()
         }
     }
     
@@ -126,6 +140,9 @@ extension TextToSpeechManager: AVSpeechSynthesizerDelegate {
             isSpeaking = false
             currentText = ""
             currentUtterance = nil
+            
+            // Clear completion handler on cancel (don't call it)
+            completionHandler = nil
             
             // Deactivate audio session
             do {

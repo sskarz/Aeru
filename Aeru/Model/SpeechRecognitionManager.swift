@@ -2,6 +2,7 @@ import Foundation
 import Speech
 import AVFoundation
 import Combine
+import AudioToolbox
 
 @MainActor
 class SpeechRecognitionManager: ObservableObject {
@@ -10,11 +11,17 @@ class SpeechRecognitionManager: ObservableObject {
     @Published var isAuthorized = false
     @Published var hasError = false
     @Published var errorMessage = ""
+    @Published var isInContinuousMode = false
     
     private var audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var silenceTimer: Timer?
+    private var lastSpeechTime: Date?
+    private let silenceThreshold: TimeInterval = 3.0 // 3 seconds of silence
+    private var onAutoStop: (() -> Void)?
+    private var audioPlayer: AVAudioPlayer?
     
     init() {
         checkAuthorization()
@@ -55,7 +62,15 @@ class SpeechRecognitionManager: ObservableObject {
     }
     
     func startRecording() {
-        print("🎙️ SpeechRecognitionManager: startRecording called")
+        startRecording(continuousMode: false, onAutoStop: nil)
+    }
+    
+    func startContinuousRecording(onAutoStop: @escaping () -> Void) {
+        startRecording(continuousMode: true, onAutoStop: onAutoStop)
+    }
+    
+    private func startRecording(continuousMode: Bool, onAutoStop: (() -> Void)?) {
+        print("🎙️ SpeechRecognitionManager: startRecording called, continuousMode: \(continuousMode)")
         print("🎙️ SpeechRecognitionManager: isAuthorized: \(isAuthorized), audioEngine.isRunning: \(audioEngine.isRunning)")
         
         guard isAuthorized else {
@@ -68,6 +83,9 @@ class SpeechRecognitionManager: ObservableObject {
             print("🎙️ SpeechRecognitionManager: Audio engine already running, returning")
             return 
         }
+        
+        isInContinuousMode = continuousMode
+        self.onAutoStop = onAutoStop
         
         print("🎙️ SpeechRecognitionManager: Resetting previous recognition state")
         // Reset previous recognition
@@ -83,6 +101,9 @@ class SpeechRecognitionManager: ObservableObject {
                 if allowed {
                     self?.isRecording = true  // Set recording state immediately when permission granted
                     print("🎙️ SpeechRecognitionManager: Set isRecording to true, starting performRecording")
+                    if self?.isInContinuousMode == true {
+                        self?.playListeningStartSound()
+                    }
                     self?.performRecording()
                 } else {
                     print("🎙️ SpeechRecognitionManager: Microphone permission denied")
@@ -136,6 +157,12 @@ class SpeechRecognitionManager: ObservableObject {
                         let newText = result.bestTranscription.formattedString
                         print("🎙️ SpeechRecognitionManager: Recognition result: '\(newText)'")
                         self?.recognizedText = newText
+                        
+                        // Update last speech time if we have text and are in continuous mode
+                        if !newText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && self?.isInContinuousMode == true {
+                            self?.lastSpeechTime = Date()
+                            self?.resetSilenceTimer()
+                        }
                     }
                     
                     if error != nil || result?.isFinal == true {
@@ -173,6 +200,11 @@ class SpeechRecognitionManager: ObservableObject {
         print("🎙️ SpeechRecognitionManager: stopRecording called, current isRecording: \(isRecording)")
         isRecording = false
         
+        // Clear silence timer
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+        lastSpeechTime = nil
+        
         if audioEngine.isRunning {
             print("🎙️ SpeechRecognitionManager: Stopping audio engine")
             audioEngine.stop()
@@ -198,6 +230,34 @@ class SpeechRecognitionManager: ObservableObject {
         }
     }
     
+    private func resetSilenceTimer() {
+        silenceTimer?.invalidate()
+        
+        if isInContinuousMode && isRecording {
+            silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceThreshold, repeats: false) { [weak self] _ in
+                Task { @MainActor in
+                    print("🎙️ SpeechRecognitionManager: Silence timeout reached, auto-stopping")
+                    if self?.isRecording == true && self?.isInContinuousMode == true {
+                        self?.playListeningStopSound()
+                        self?.stopRecording()
+                        self?.onAutoStop?()
+                    }
+                }
+            }
+        }
+    }
+    
+    func exitContinuousMode() {
+        isInContinuousMode = false
+        onAutoStop = nil
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+        lastSpeechTime = nil
+        if isRecording {
+            stopRecording()
+        }
+    }
+    
     private func showError(_ message: String) {
         errorMessage = message
         hasError = true
@@ -211,5 +271,15 @@ class SpeechRecognitionManager: ObservableObject {
     
     func clearRecognizedText() {
         recognizedText = ""
+    }
+    
+    private func playListeningStartSound() {
+        // Use system sound for listening start
+        AudioServicesPlaySystemSound(1113) // Tock sound
+    }
+    
+    private func playListeningStopSound() {
+        // Use system sound for listening stop
+        AudioServicesPlaySystemSound(1114) // Tick sound
     }
 }
