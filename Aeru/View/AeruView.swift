@@ -73,20 +73,49 @@ struct AeruView: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Main chat area (gets pushed by sidebar)
-                VStack(spacing: 0) {
-                    // Header
-                    headerView
-                    
-                    // Chat content
-                    if let currentSession = sessionManager.currentSession {
-                        chatContentView(for: currentSession)
-                    } else {
-                        emptyStateView
+                NavigationView {
+                    VStack(spacing: 0) {
+                        // Chat content
+                        if let currentSession = sessionManager.currentSession {
+                            chatContentView(for: currentSession)
+                        } else {
+                            emptyStateView
+                        }
+                        
+                        // Input area
+                        if sessionManager.currentSession != nil {
+                            inputView
+                        }
                     }
-                    
-                    // Input area
-                    if sessionManager.currentSession != nil {
-                        inputView
+                    .navigationTitle(sessionManager.currentSession?.displayTitle ?? "Aeru")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button(action: { 
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                isMessageFieldFocused = false
+                                showSidebar.toggle()
+                            }) {
+                                Image(systemName: "line.3.horizontal")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            if !shouldHideNewChatButton {
+                                Button(action: {
+                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                    impactFeedback.impactOccurred()
+                                    handleNewChatCreation()
+                                }) {
+                                    Image(systemName: "plus.message")
+                                        .font(.title3)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -227,57 +256,6 @@ struct AeruView: View {
         .preferredColorScheme(AppColorScheme(rawValue: selectedColorScheme)?.colorScheme)
     }
     
-    private var headerView: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 16) {
-                // Sidebar toggle
-                Button(action: { 
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                    isMessageFieldFocused = false
-                    showSidebar.toggle()
-                }) {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                        .frame(width: 24, height: 24)
-                }
-                
-                VStack(alignment: .center, spacing: 2) {
-                    Text(sessionManager.currentSession?.displayTitle ?? "Aeru")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                        .multilineTextAlignment(.center)
-                }
-                
-                // New chat button - disappears when unavailable
-                if !shouldHideNewChatButton {
-                    Button(action: {
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
-                        handleNewChatCreation()
-                    }) {
-                        Image(systemName: "plus.message")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-                            .frame(width: 24, height: 24)
-                    }
-                } else {
-                    // Empty spacer to maintain layout balance
-                    Spacer()
-                        .frame(width: 24, height: 24)
-                }
-                
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
-            
-            Divider()
-        }
-        .background(Color(.systemBackground))
-    }
     
     private func chatContentView(for session: ChatSession) -> some View {
         ScrollViewReader { proxy in
