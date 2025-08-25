@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		684097A92E3DC29700EE87CF /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 684097A82E3DC29700EE87CF /* MarkdownUI */; };
 		684C44A42E3444080093FD7D /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = 684C44A32E3444080093FD7D /* SQLite */; };
+		68540D592E5CF3FF00CF8733 /* OtosakuTTS-iOS in Frameworks */ = {isa = PBXBuildFile; productRef = 68540D582E5CF3FF00CF8733 /* OtosakuTTS-iOS */; };
 		685AAA9E2E268842008B5063 /* SVDB in Frameworks */ = {isa = PBXBuildFile; productRef = 685AAA9D2E268842008B5063 /* SVDB */; };
 		68AE0FD32E2B1B5400D359D7 /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 68AE0FD22E2B1B5400D359D7 /* SwiftSoup */; };
 /* End PBXBuildFile section */
@@ -47,6 +48,7 @@
 				685AAA9E2E268842008B5063 /* SVDB in Frameworks */,
 				68AE0FD32E2B1B5400D359D7 /* SwiftSoup in Frameworks */,
 				684097A92E3DC29700EE87CF /* MarkdownUI in Frameworks */,
+				68540D592E5CF3FF00CF8733 /* OtosakuTTS-iOS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,6 +95,7 @@
 				68AE0FD22E2B1B5400D359D7 /* SwiftSoup */,
 				684C44A32E3444080093FD7D /* SQLite */,
 				684097A82E3DC29700EE87CF /* MarkdownUI */,
+				68540D582E5CF3FF00CF8733 /* OtosakuTTS-iOS */,
 			);
 			productName = RAGSearchLLM;
 			productReference = 685AAA8B2E268669008B5063 /* Aeru.app */;
@@ -127,6 +130,7 @@
 				68AE0FD12E2B1B5400D359D7 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 				684C44A22E3444080093FD7D /* XCRemoteSwiftPackageReference "SQLite.swift" */,
 				684097A72E3DC29700EE87CF /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				68540D572E5CF3FF00CF8733 /* XCRemoteSwiftPackageReference "OtosakuTTS-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 685AAA8C2E268669008B5063 /* Products */;
@@ -396,6 +400,14 @@
 				minimumVersion = 0.15.4;
 			};
 		};
+		68540D572E5CF3FF00CF8733 /* XCRemoteSwiftPackageReference "OtosakuTTS-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Otosaku/OtosakuTTS-iOS.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		685AAA9C2E268842008B5063 /* XCRemoteSwiftPackageReference "SVDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Dripfarm/SVDB.git";
@@ -424,6 +436,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 684C44A22E3444080093FD7D /* XCRemoteSwiftPackageReference "SQLite.swift" */;
 			productName = SQLite;
+		};
+		68540D582E5CF3FF00CF8733 /* OtosakuTTS-iOS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 68540D572E5CF3FF00CF8733 /* XCRemoteSwiftPackageReference "OtosakuTTS-iOS" */;
+			productName = "OtosakuTTS-iOS";
 		};
 		685AAA9D2E268842008B5063 /* SVDB */ = {
 			isa = XCSwiftPackageProductDependency;
