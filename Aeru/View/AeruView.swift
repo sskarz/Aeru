@@ -42,6 +42,9 @@ struct AeruView: View {
     @State private var showVoiceConversation: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
+    // Input bar state
+    @State private var inputHeight: CGFloat = 100
+    
     // Sidebar animation properties
     @State private var offset: CGFloat = 0
     @GestureState private var gestureOffset: CGFloat = 0
@@ -67,6 +70,93 @@ struct AeruView: View {
         // Stop any ongoing TTS when starting a new chat
         textToSpeechManager.stopSpeaking()
         _ = sessionManager.getOrCreateNewChat()
+    }
+    
+    private var inputBar: some View {
+        HStack(spacing: 12) {
+            // Document upload button
+            Button(action: { 
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                showKnowledgeBase.toggle() 
+            }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .glassEffect(.regular.interactive())
+            }
+            
+            // Text input area
+            HStack(spacing: 8) {
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $messageText)
+                        .focused($isMessageFieldFocused)
+                        .font(.body)
+                        .textInputAutocapitalization(.sentences)
+                        .disableAutocorrection(false)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 20, maxHeight: 100)
+                        .onChange(of: messageText) { _, newValue in
+                            updateInputHeight()
+                        }
+                    
+                    if messageText.isEmpty {
+                        Text("Type a message...")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 5)
+                            .allowsHitTesting(false)
+                    }
+                }
+                
+                // Send/Voice button
+                Button(action: {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    
+                    if messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        speechRecognitionManager.stopRecording()
+                        startInstantVoiceConversation()
+                    } else {
+                        sendMessage()
+                    }
+                }) {
+                    Image(systemName: messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "waveform" : "arrow.up")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                        )
+                }
+                .disabled(isModelResponding)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .glassEffect(.regular.interactive())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+    
+    private func updateInputHeight() {
+        let newHeight = max(50, min(100, calculateTextHeight() + 24))
+        withAnimation(.easeInOut(duration: 0.2)) {
+            inputHeight = newHeight
+        }
+    }
+    
+    private func calculateTextHeight() -> CGFloat {
+        let font = UIFont.systemFont(ofSize: 17)
+        let textSize = messageText.boundingRect(
+            with: CGSize(width: UIScreen.main.bounds.width - 120, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font],
+            context: nil
+        )
+        return max(20, textSize.height)
     }
     
     var body: some View {
@@ -112,94 +202,11 @@ struct AeruView: View {
                             }
                         }
                         
+                    }
+                    .safeAreaInset(edge: .bottom) {
                         if sessionManager.currentSession != nil {
-                            // Document upload button
-                            ToolbarItem(placement: .bottomBar) {
-                                Button(action: { 
-                                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                                    impactFeedback.impactOccurred()
-                                    showKnowledgeBase.toggle() 
-                                }) {
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.blue)
-                                        .frame(width: 40, height: 40)
-                                }
-                            }
-                            ToolbarSpacer(placement: .bottomBar)
-                            
-                            // Text input
-                            ToolbarItem(placement: .bottomBar) {
-                                TextField("Type a message...", text: $messageText, axis: .vertical)
-                                    .textFieldStyle(.plain)
-                                    .focused($isMessageFieldFocused)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                                    .lineLimit(1...2)
-                                    .textInputAutocapitalization(.sentences)
-                                    .disableAutocorrection(false)
-                            }
-                            ToolbarSpacer(placement: .bottomBar)
-                            
-//                            // Voice input button
-//                            ToolbarItem(placement: .bottomBar) {
-//                                Button(action: {
-//                                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-//                                    impactFeedback.impactOccurred()
-//                                    handleVoiceButtonTap()
-//                                }) {
-//                                    Image(systemName: speechRecognitionManager.isRecording ? "mic.fill" : "mic")
-//                                        .font(.system(size: 16, weight: .medium))
-//                                        .foregroundColor(speechRecognitionManager.isRecording ? .red : .blue)
-//                                        .frame(width: 40, height: 40)
-//                                        .background(
-//                                            Circle()
-//                                                .fill(speechRecognitionManager.isRecording ? 
-//                                                      Color.red.opacity(0.1) : Color.clear
-//                                        ))
-//                                }
-//                                .disabled(isModelResponding)
-//                            }
-//                            ToolbarSpacer(placement: .bottomBar)
-                            
-                            // Send button OR Voice Conversation button
-                            ToolbarItem(placement: .bottomBar) {
-                                if messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Button(action: {
-                                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                                        impactFeedback.impactOccurred()
-                                        speechRecognitionManager.stopRecording()
-                                        startInstantVoiceConversation()
-                                    }) {
-                                        Image(systemName: "waveform")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white)
-                                            .frame(width: 40, height: 40)
-                                            .background(
-                                                Circle()
-                                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
-                                            )
-                                    }
-                                    .disabled(isModelResponding)
-                                } else {
-                                    Button(action: {
-                                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                                        impactFeedback.impactOccurred()
-                                        sendMessage()
-                                    }) {
-                                        Image(systemName: "arrow.up")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white)
-                                            .frame(width: 40, height: 40)
-                                            .background(
-                                                Circle()
-                                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
-                                            )
-                                    }
-                                    .disabled(isModelResponding)
-                                }
-                            }
+                            inputBar
+                                .frame(height: inputHeight)
                         }
                     }
                 }
@@ -207,19 +214,6 @@ struct AeruView: View {
                 .background(Color(.systemBackground))
                 .offset(x: max(offset + gestureOffset, 0))
                 .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
-                .overlay(
-                    // Overlay for dimming when sidebar is open
-                    Color.black.opacity(getOverlayOpacity())
-                        .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: showSidebar)
-                        .onTapGesture {
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                            impactFeedback.impactOccurred()
-                            withAnimation {
-                                showSidebar = false
-                            }
-                        }
-                        .allowsHitTesting(showSidebar)
-                )
                 
                 // Sidebar
                 ChatSidebar(sessionManager: sessionManager)
@@ -256,6 +250,9 @@ struct AeruView: View {
             }
         }
         .onAppear {
+            // Set initial input height
+            updateInputHeight()
+            
             // Defer heavy initialization to avoid blocking UI
             Task {
                 // Wait for sessions to load from database first
@@ -405,7 +402,7 @@ struct AeruView: View {
                     
                     // Bottom spacer for better scroll behavior
                     Spacer()
-                        .frame(height: 20)
+                        .frame(height: 8)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -431,6 +428,17 @@ struct AeruView: View {
                 if newValue && !llm.isResponding {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo("typing", anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: isMessageFieldFocused) { _, newValue in
+                if newValue && !llm.chatMessages.isEmpty {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            if let lastMessage = llm.chatMessages.last {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
                     }
                 }
             }
@@ -541,10 +549,6 @@ struct AeruView: View {
         }
     }
     
-    private func getOverlayOpacity() -> CGFloat {
-        let progress = (offset + gestureOffset) / sidebarWidth
-        return min(progress * 0.4, 0.4) // Max opacity of 0.4
-    }
 }
 
 struct ChatBubbleView: View {
