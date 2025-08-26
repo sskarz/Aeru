@@ -578,6 +578,7 @@ struct ChatBubbleView: View {
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
+                                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
                                         .fill(Color.blue.opacity(0.1))
@@ -604,6 +605,7 @@ struct ChatBubbleView: View {
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
+                                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
                                         .fill(Color.blue.opacity(0.1))
