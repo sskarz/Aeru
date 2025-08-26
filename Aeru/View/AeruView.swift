@@ -42,8 +42,6 @@ struct AeruView: View {
     @State private var showVoiceConversation: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
-    // Input bar state
-    @State private var inputHeight: CGFloat = 100
     
     // Sidebar animation properties
     @State private var offset: CGFloat = 0
@@ -89,27 +87,14 @@ struct AeruView: View {
             
             // Text input area
             HStack(spacing: 8) {
-                ZStack(alignment: .topLeading) {
-                    TextEditor(text: $messageText)
-                        .focused($isMessageFieldFocused)
-                        .font(.body)
-                        .textInputAutocapitalization(.sentences)
-                        .disableAutocorrection(false)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 20, maxHeight: 100)
-                        .onChange(of: messageText) { _, newValue in
-                            updateInputHeight()
-                        }
-                    
-                    if messageText.isEmpty {
-                        Text("Type a message...")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 5)
-                            .padding(.top, 8)
-                            .allowsHitTesting(false)
-                    }
-                }
+                TextField("Type a message...", text: $messageText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .lineLimit(1...3)
+                    .textInputAutocapitalization(.sentences)
+                    .disableAutocorrection(false)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
                 
                 // Send/Voice button
                 Button(action: {
@@ -134,30 +119,10 @@ struct AeruView: View {
                 }
                 .disabled(isModelResponding)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .glassEffect(.regular.interactive())
         }
         .padding(.horizontal, 16)
     }
     
-    private func updateInputHeight() {
-        let newHeight = max(50, min(100, calculateTextHeight() + 24))
-        withAnimation(.easeInOut(duration: 0.2)) {
-            inputHeight = newHeight
-        }
-    }
-    
-    private func calculateTextHeight() -> CGFloat {
-        let font = UIFont.systemFont(ofSize: 17)
-        let textSize = messageText.boundingRect(
-            with: CGSize(width: UIScreen.main.bounds.width - 120, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: font],
-            context: nil
-        )
-        return max(20, textSize.height)
-    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -206,7 +171,6 @@ struct AeruView: View {
                     .safeAreaInset(edge: .bottom) {
                         if sessionManager.currentSession != nil {
                             inputBar
-                                .frame(height: inputHeight)
                         }
                     }
                 }
@@ -250,9 +214,6 @@ struct AeruView: View {
             }
         }
         .onAppear {
-            // Set initial input height
-            updateInputHeight()
-            
             // Defer heavy initialization to avoid blocking UI
             Task {
                 // Wait for sessions to load from database first
