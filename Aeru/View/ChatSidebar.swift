@@ -62,16 +62,18 @@ struct ChatSidebar: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if isSelectionMode {
-                        Button("Cancel") {
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                            impactFeedback.impactOccurred()
+                    Button(isSelectionMode ? "Cancel" : "Select") {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        if isSelectionMode {
                             isSelectionMode = false
                             selectedSessions.removeAll()
+                        } else {
+                            isSelectionMode = true
                         }
-                        .font(.body)
-                        .foregroundColor(.primary)
                     }
+                    .font(.body)
+                    .foregroundColor(.primary)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -114,20 +116,6 @@ struct ChatSidebar: View {
                                 .font(.body)
                                 .foregroundColor(.primary)
                         }
-                    }
-                }
-                
-                ToolbarSpacer(placement: .bottomBar)
-                
-                ToolbarItem(placement: .bottomBar) {
-                    Button(action: { 
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
-                        isSelectionMode = true 
-                    }) {
-                        Image(systemName: "checkmark.circle")
-                            .font(.title3)
-                            .foregroundColor(.primary)
                     }
                 }
             }
@@ -210,12 +198,12 @@ struct ChatSessionRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(session.displayTitle)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isSelected && !isSelectionMode ? .white : .primary)
+                    .foregroundColor(isSelected && !isSelectionMode ? .secondary : .primary)
                     .lineLimit(1)
                 
                 Text(session.formattedDate)
                     .font(.caption2)
-                    .foregroundColor(isSelected && !isSelectionMode ? .white.opacity(0.8) : .secondary)
+                    .foregroundColor(isSelected && !isSelectionMode ? .primary : .secondary)
             }
             
             Spacer()
@@ -242,7 +230,7 @@ struct ChatSessionRow: View {
         .padding(.vertical, 10)
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(isSelected && !isSelectionMode ? Color.blue : Color.clear)
         )
         .contentShape(Rectangle())

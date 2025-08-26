@@ -110,8 +110,9 @@ struct AeruView: View {
                 }) {
                     Image(systemName: messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "waveform" : "arrow.up")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(.secondary)
                         .frame(width: 32, height: 32)
+                        .glassEffect(.regular.interactive())
                         .background(
                             Circle()
                                 .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
@@ -537,16 +538,18 @@ struct ChatBubbleView: View {
                         .textSelection(.enabled)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
                         .background(
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.blue)
                         )
-                        .foregroundColor(.white)
+                        .foregroundColor(.secondary)
                 } else {
                     Markdown(message.text)
                         .textSelection(.enabled)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
                         .background(
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color(.systemGray5))
@@ -738,8 +741,7 @@ struct SourcesView: View {
                             }
                         }
                         .padding(16)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
                         .onTapGesture {
                             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                             impactFeedback.impactOccurred()
@@ -765,15 +767,6 @@ struct SourcesView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-            }
-            .navigationTitle("Sources")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
             }
         }
     }
