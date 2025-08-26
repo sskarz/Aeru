@@ -21,64 +21,7 @@ struct ChatSidebar: View {
     @State private var showingSettings = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            VStack(spacing: 12) {
-                HStack {
-                    if isSelectionMode {
-                        Button("Cancel") {
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                            impactFeedback.impactOccurred()
-                            isSelectionMode = false
-                            selectedSessions.removeAll()
-                        }
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        Text("\(selectedSessions.count) selected")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                        
-                        Spacer()
-                        
-                        Button(action: { 
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                            impactFeedback.impactOccurred()
-                            showingBulkDeleteAlert = true 
-                        }) {
-                            Image(systemName: "trash")
-                                .font(.title3)
-                                .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
-                        }
-                        .disabled(selectedSessions.isEmpty)
-                    } else {
-                        Text("Chats")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Spacer()
-                        
-                        Button(action: { 
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                            impactFeedback.impactOccurred()
-                            _ = sessionManager.getOrCreateNewChat()
-                        }) {
-                            Image(systemName: "plus.message")
-                                .font(.title3)
-                                .foregroundColor(.primary)
-                                .frame(width: 24, height: 24)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-                
-                Divider()
-            }
-            
-            // Chat sessions list
+        NavigationView {
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(sessionManager.displayedSessions) { session in
@@ -115,13 +58,48 @@ struct ChatSidebar: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
             }
-            .frame(maxHeight: .infinity)
-            
-            // Bottom controls
-            VStack(spacing: 0) {
-                Divider()
+            .navigationTitle(isSelectionMode ? "\(selectedSessions.count) selected" : "Chats")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if isSelectionMode {
+                        Button("Cancel") {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            isSelectionMode = false
+                            selectedSessions.removeAll()
+                        }
+                        .font(.body)
+                        .foregroundColor(.primary)
+                    }
+                }
                 
-                HStack {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isSelectionMode {
+                        Button(action: { 
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            showingBulkDeleteAlert = true 
+                        }) {
+                            Image(systemName: "trash")
+                                .font(.title3)
+                                .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
+                        }
+                        .disabled(selectedSessions.isEmpty)
+                    } else {
+                        Button(action: { 
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            _ = sessionManager.getOrCreateNewChat()
+                        }) {
+                            Image(systemName: "plus.message")
+                                .font(.title3)
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
                     Button(action: { 
                         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                         impactFeedback.impactOccurred()
@@ -137,10 +115,11 @@ struct ChatSidebar: View {
                                 .foregroundColor(.primary)
                         }
                     }
-                    .buttonStyle(.plain)
-                    
-                    Spacer()
-                    
+                }
+                
+                ToolbarSpacer(placement: .bottomBar)
+                
+                ToolbarItem(placement: .bottomBar) {
                     Button(action: { 
                         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                         impactFeedback.impactOccurred()
@@ -149,12 +128,8 @@ struct ChatSidebar: View {
                         Image(systemName: "checkmark.circle")
                             .font(.title3)
                             .foregroundColor(.primary)
-                            .frame(width: 24, height: 24)
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
             }
         }
         .background(Color(.systemBackground))
@@ -265,6 +240,7 @@ struct ChatSessionRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(isSelected && !isSelectionMode ? Color.blue : Color.clear)
