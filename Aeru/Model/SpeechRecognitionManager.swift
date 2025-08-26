@@ -13,32 +13,78 @@ class SpeechRecognitionManager: ObservableObject {
     @Published var errorMessage = ""
     @Published var isInContinuousMode = false
     
+    // Legacy Speech Framework (iOS < 26)
     private var audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    
+    // Modern Speech Framework (iOS 26+)
+    private var modernTranscriber: SpokenWordTranscriber?
+    private var modernRecorder: ModernAudioRecorder?
+    
+    // Common properties
     private var silenceTimer: Timer?
     private var lastSpeechTime: Date?
     private let silenceThreshold: TimeInterval = 1.5 // 1.5 seconds of silence
     private var onAutoStop: (() -> Void)?
     private var audioPlayer: AVAudioPlayer?
     
+    private var useModernFramework: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        } else {
+            return false
+        }
+    }
+    
     init() {
         checkAuthorization()
+        setupModernFramework()
+    }
+    
+    private func setupModernFramework() {
+        if useModernFramework {
+            modernTranscriber = SpokenWordTranscriber(locale: Locale(identifier: "en-US"))
+            if let transcriber = modernTranscriber {
+                modernRecorder = ModernAudioRecorder(transcriber: transcriber)
+            }
+        }
     }
     
     private func checkAuthorization() {
+        if useModernFramework {
+            checkModernAuthorization()
+        } else {
+            checkLegacyAuthorization()
+        }
+    }
+    
+    private func checkLegacyAuthorization() {
         switch SFSpeechRecognizer.authorizationStatus() {
         case .authorized:
             isAuthorized = true
         case .denied, .restricted, .notDetermined:
-            requestAuthorization()
+            requestLegacyAuthorization()
         @unknown default:
             isAuthorized = false
         }
     }
     
-    private func requestAuthorization() {
+    private func checkModernAuthorization() {
+        // For iOS 26+, check microphone permissions using AVCaptureDevice
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        switch status {
+        case .authorized:
+            isAuthorized = true
+        case .denied, .restricted, .notDetermined:
+            requestModernAuthorization()
+        @unknown default:
+            isAuthorized = false
+        }
+    }
+    
+    private func requestLegacyAuthorization() {
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             DispatchQueue.main.async {
                 switch status {
@@ -61,6 +107,18 @@ class SpeechRecognitionManager: ObservableObject {
         }
     }
     
+    private func requestModernAuthorization() {
+        Task {
+            let granted = await AVCaptureDevice.requestAccess(for: .audio)
+            await MainActor.run {
+                self.isAuthorized = granted
+                if !granted {
+                    self.showError("Microphone permission denied")
+                }
+            }
+        }
+    }
+    
     func startRecording() {
         startRecording(continuousMode: false, onAutoStop: nil)
     }
@@ -75,10 +133,6 @@ class SpeechRecognitionManager: ObservableObject {
             return
         }
         
-        guard !audioEngine.isRunning else { 
-            return 
-        }
-        
         isInContinuousMode = continuousMode
         self.onAutoStop = onAutoStop
         
@@ -86,6 +140,18 @@ class SpeechRecognitionManager: ObservableObject {
         stopRecording()
         recognizedText = ""
         hasError = false
+        
+        if useModernFramework {
+            startModernRecording()
+        } else {
+            startLegacyRecording()
+        }
+    }
+    
+    private func startLegacyRecording() {
+        guard !audioEngine.isRunning else { 
+            return 
+        }
         
         // Request microphone permission
         AVAudioApplication.requestRecordPermission() { [weak self] allowed in
@@ -95,7 +161,7 @@ class SpeechRecognitionManager: ObservableObject {
                     if self?.isInContinuousMode == true {
                         self?.playListeningStartSound()
                     }
-                    self?.performRecording()
+                    self?.performLegacyRecording()
                 } else {
                     self?.showError("Microphone permission denied")
                 }
@@ -103,7 +169,50 @@ class SpeechRecognitionManager: ObservableObject {
         }
     }
     
-    private func performRecording() {
+    private func startModernRecording() {
+        guard let transcriber = modernTranscriber,
+              let recorder = modernRecorder else {
+            showError("Modern speech framework not available")
+            return
+        }
+        
+        isRecording = true
+        if isInContinuousMode {
+            playListeningStartSound()
+        }
+        
+        Task {
+            do {
+                try await recorder.record()
+            } catch {
+                await MainActor.run {
+                    self.showError("Modern recording failed: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        // Monitor transcriber for text updates
+        Task {
+            while isRecording {
+                await MainActor.run {
+                    let newText = transcriber.transcribedText
+                    if newText != self.recognizedText {
+                        self.recognizedText = newText
+                        
+                        // Update last speech time if we have text and are in continuous mode
+                        if !newText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && self.isInContinuousMode {
+                            self.lastSpeechTime = Date()
+                            self.resetSilenceTimer()
+                        }
+                    }
+                }
+                
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+            }
+        }
+    }
+    
+    private func performLegacyRecording() {
         do {
             // Configure audio session
             let audioSession = AVAudioSession.sharedInstance()
@@ -178,6 +287,14 @@ class SpeechRecognitionManager: ObservableObject {
         silenceTimer = nil
         lastSpeechTime = nil
         
+        if useModernFramework {
+            stopModernRecording()
+        } else {
+            stopLegacyRecording()
+        }
+    }
+    
+    private func stopLegacyRecording() {
         if audioEngine.isRunning {
             audioEngine.stop()
             audioEngine.inputNode.removeTap(onBus: 0)
@@ -194,6 +311,20 @@ class SpeechRecognitionManager: ObservableObject {
             try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             // Silent fail for audio session deactivation
+        }
+    }
+    
+    private func stopModernRecording() {
+        guard let recorder = modernRecorder else { return }
+        
+        Task {
+            do {
+                try await recorder.stopRecording()
+            } catch {
+                await MainActor.run {
+                    // Silent fail for stop recording
+                }
+            }
         }
     }
     

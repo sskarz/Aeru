@@ -2,6 +2,7 @@ import SwiftUI
 import Foundation
 import FoundationModels
 import MarkdownUI
+import AudioToolbox
 
 struct VoiceConversationView: View {
     let llm: LLM
@@ -17,30 +18,44 @@ struct VoiceConversationView: View {
     @State private var isInLiveMode: Bool = false
     @State private var conversationHistory: [(user: String, ai: String)] = []
     
+    // Modern STT components
+    @StateObject private var modernTranscriber = SpokenWordTranscriber(locale: Locale(identifier: "en-US"))
+    @StateObject private var modernRecorder: ModernAudioRecorder
+    @State private var silenceTimer: Timer?
+    @State private var lastSpeechTime: Date?
+    private let silenceThreshold: TimeInterval = 1.5
+    
+    private var useModernFramework: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        } else {
+            return false
+        }
+    }
+    
+    private var isCurrentlyRecording: Bool {
+        if useModernFramework {
+            return modernRecorder.isRecording
+        } else {
+            return speechRecognitionManager.isRecording
+        }
+    }
+    
+    init(llm: LLM, speechRecognitionManager: SpeechRecognitionManager, textToSpeechManager: TextToSpeechManager, currentSession: ChatSession, sessionManager: ChatSessionManager) {
+        self.llm = llm
+        self.speechRecognitionManager = speechRecognitionManager
+        self.textToSpeechManager = textToSpeechManager
+        self.currentSession = currentSession
+        self.sessionManager = sessionManager
+        
+        let transcriber = SpokenWordTranscriber(locale: Locale(identifier: "en-US"))
+        self._modernRecorder = StateObject(wrappedValue: ModernAudioRecorder(transcriber: transcriber))
+        self._modernTranscriber = StateObject(wrappedValue: transcriber)
+    }
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: getHeaderIcon())
-                        .font(.system(size: 48))
-                        .foregroundColor(getHeaderColor())
-                        .scaleEffect(speechRecognitionManager.isRecording ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.3), value: speechRecognitionManager.isRecording)
-                    
-                    Text("Live Conversation")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    
-                    Text(getStatusText())
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 20)
-                
-                Spacer()
-                
                 // Conversation Content
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -85,7 +100,7 @@ struct VoiceConversationView: View {
                             // Current exchange
                             VStack(spacing: 12) {
                                 // Current user input
-                                if !userText.isEmpty || speechRecognitionManager.isRecording {
+                                if !userText.isEmpty || isCurrentlyRecording {
                                     HStack {
                                         Spacer(minLength: 50)
                                         
@@ -153,7 +168,7 @@ struct VoiceConversationView: View {
                             proxy.scrollTo("current", anchor: .bottom)
                         }
                     }
-                    .onChange(of: speechRecognitionManager.isRecording) { _, newValue in
+                    .onChange(of: isCurrentlyRecording) { _, newValue in
                         // Scroll when recording state changes
                         if newValue {
                             withAnimation(.easeInOut(duration: 0.3)) {
@@ -228,11 +243,33 @@ struct VoiceConversationView: View {
             .navigationTitle("Voice Chat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 8) {
+                        Image(systemName: getHeaderIcon())
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(getHeaderColor())
+                            .scaleEffect(isCurrentlyRecording ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: isCurrentlyRecording)
+                        
+                        Text("Live Conversation")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         exitLiveMode()
                         textToSpeechManager.stopSpeaking()
-                        speechRecognitionManager.stopRecording()
+                        
+                        if useModernFramework {
+                            Task {
+                                try? await modernRecorder.stopRecording()
+                            }
+                        } else {
+                            speechRecognitionManager.stopRecording()
+                        }
+                        
                         dismiss()
                     }
                 }
@@ -249,7 +286,14 @@ struct VoiceConversationView: View {
         .onDisappear {
             exitLiveMode()
             textToSpeechManager.stopSpeaking()
-            speechRecognitionManager.stopRecording()
+            
+            if useModernFramework {
+                Task {
+                    try? await modernRecorder.stopRecording()
+                }
+            } else {
+                speechRecognitionManager.stopRecording()
+            }
         }
         .onReceive(llm.$userLLMResponse) { streamingResponse in
             if let response = streamingResponse {
@@ -262,7 +306,7 @@ struct VoiceConversationView: View {
     // MARK: - Helper Methods for UI
     private func getHeaderIcon() -> String {
         if isInLiveMode {
-            if speechRecognitionManager.isRecording {
+            if isCurrentlyRecording {
                 return "waveform.circle.fill"
             } else if textToSpeechManager.isSpeaking {
                 return "speaker.wave.3.fill"
@@ -278,7 +322,7 @@ struct VoiceConversationView: View {
     
     private func getHeaderColor() -> Color {
         if isInLiveMode {
-            if speechRecognitionManager.isRecording {
+            if isCurrentlyRecording {
                 return .red
             } else if textToSpeechManager.isSpeaking {
                 return .green
@@ -294,7 +338,7 @@ struct VoiceConversationView: View {
     
     private func getStatusText() -> String {
         if isInLiveMode {
-            if speechRecognitionManager.isRecording {
+            if isCurrentlyRecording {
                 return "Listening for your voice..."
             } else if isWaitingForResponse {
                 return "Processing your request..."
@@ -320,7 +364,13 @@ struct VoiceConversationView: View {
     
     private func exitLiveMode() {
         isInLiveMode = false
-        speechRecognitionManager.exitContinuousMode()
+        
+        if useModernFramework {
+            stopModernListening()
+        } else {
+            speechRecognitionManager.exitContinuousMode()
+        }
+        
         textToSpeechManager.stopSpeaking()
         resetCurrentExchange()
     }
@@ -329,18 +379,91 @@ struct VoiceConversationView: View {
         userText = ""
         aiResponse = ""
         
-        speechRecognitionManager.startContinuousRecording {
-            Task { @MainActor in
-                self.onVoiceInputComplete()
+        if useModernFramework {
+            startModernListening()
+        } else {
+            speechRecognitionManager.startContinuousRecording {
+                Task { @MainActor in
+                    self.onVoiceInputComplete()
+                }
             }
         }
     }
     
-    private func onVoiceInputComplete() {
-        guard isInLiveMode, !speechRecognitionManager.recognizedText.isEmpty else { return }
+    private func startModernListening() {
+        // Clear previous text
+        modernTranscriber.clearTranscribedText()
         
-        userText = speechRecognitionManager.recognizedText
-        speechRecognitionManager.clearRecognizedText()
+        // Play listening sound
+        AudioServicesPlaySystemSound(1113) // Tock sound
+        
+        Task {
+            do {
+                try await modernRecorder.record()
+            } catch {
+                print("Modern recording failed: \(error)")
+            }
+        }
+        
+        // Monitor for transcribed text and silence
+        Task {
+            while modernRecorder.isRecording {
+                let currentText = modernTranscriber.transcribedText
+                
+                if currentText != userText {
+                    userText = currentText
+                    
+                    // Update last speech time if we have meaningful text
+                    if !currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        lastSpeechTime = Date()
+                        resetModernSilenceTimer()
+                    }
+                }
+                
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+            }
+        }
+    }
+    
+    private func resetModernSilenceTimer() {
+        silenceTimer?.invalidate()
+        
+        silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceThreshold, repeats: false) { _ in
+            Task { @MainActor in
+                if self.modernRecorder.isRecording {
+                    self.stopModernListening()
+                    self.onVoiceInputComplete()
+                }
+            }
+        }
+    }
+    
+    private func stopModernListening() {
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+        
+        // Play listening stop sound
+        AudioServicesPlaySystemSound(1114) // Tick sound
+        
+        Task {
+            try? await modernRecorder.stopRecording()
+        }
+    }
+    
+    private func onVoiceInputComplete() {
+        let recognizedText: String
+        
+        if useModernFramework {
+            guard isInLiveMode, !modernTranscriber.transcribedText.isEmpty else { return }
+            recognizedText = modernTranscriber.transcribedText
+            modernTranscriber.clearTranscribedText()
+        } else {
+            guard isInLiveMode, !speechRecognitionManager.recognizedText.isEmpty else { return }
+            recognizedText = speechRecognitionManager.recognizedText
+            speechRecognitionManager.clearRecognizedText()
+        }
+        
+        userText = recognizedText
         
         Task {
             await queryLLMInLiveMode()
