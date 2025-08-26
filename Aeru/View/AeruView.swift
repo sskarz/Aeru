@@ -838,6 +838,7 @@ struct KnowledgeBaseView: View {
                     .background(useWebSearch ? Color.blue : Color.blue.opacity(0.1))
                     .foregroundColor(useWebSearch ? .white : .blue)
                     .cornerRadius(8)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 8.0))
                 }
                 
                 // Uploaded Documents
@@ -856,6 +857,7 @@ struct KnowledgeBaseView: View {
                             .frame(width: 120, height: 80)
                             .background(Color(.systemGray6))
                             .cornerRadius(8)
+                            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 8.0))
                         }
                     }
                 }
