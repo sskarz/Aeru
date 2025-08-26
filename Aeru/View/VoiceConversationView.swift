@@ -2,7 +2,6 @@ import SwiftUI
 import Foundation
 import FoundationModels
 import MarkdownUI
-import AudioToolbox
 
 struct VoiceConversationView: View {
     let llm: LLM
@@ -17,30 +16,6 @@ struct VoiceConversationView: View {
     @State private var isWaitingForResponse: Bool = false
     @State private var isInLiveMode: Bool = false
     @State private var conversationHistory: [(user: String, ai: String)] = []
-    
-    // Modern STT components
-    @StateObject private var modernTranscriber = SpokenWordTranscriber(locale: Locale(identifier: "en-US"))
-    @StateObject private var modernRecorder: ModernAudioRecorder
-    @State private var silenceTimer: Timer?
-    @State private var lastSpeechTime: Date?
-    @State private var hasReceivedFirstTranscription = false
-    private let silenceThreshold: TimeInterval = 1.5
-    
-    private var isCurrentlyRecording: Bool {
-        return modernRecorder.isRecording
-    }
-    
-    init(llm: LLM, speechRecognitionManager: SpeechRecognitionManager, textToSpeechManager: TextToSpeechManager, currentSession: ChatSession, sessionManager: ChatSessionManager) {
-        self.llm = llm
-        self.speechRecognitionManager = speechRecognitionManager
-        self.textToSpeechManager = textToSpeechManager
-        self.currentSession = currentSession
-        self.sessionManager = sessionManager
-        
-        let transcriber = SpokenWordTranscriber(locale: Locale(identifier: "en-US"))
-        self._modernRecorder = StateObject(wrappedValue: ModernAudioRecorder(transcriber: transcriber))
-        self._modernTranscriber = StateObject(wrappedValue: transcriber)
-    }
     
     var body: some View {
         NavigationView {
@@ -89,7 +64,7 @@ struct VoiceConversationView: View {
                             // Current exchange
                             VStack(spacing: 12) {
                                 // Current user input
-                                if !userText.isEmpty || isCurrentlyRecording {
+                                if !userText.isEmpty || speechRecognitionManager.isRecording {
                                     HStack {
                                         Spacer(minLength: 50)
                                         
@@ -157,7 +132,7 @@ struct VoiceConversationView: View {
                             proxy.scrollTo("current", anchor: .bottom)
                         }
                     }
-                    .onChange(of: isCurrentlyRecording) { _, newValue in
+                    .onChange(of: speechRecognitionManager.isRecording) { _, newValue in
                         // Scroll when recording state changes
                         if newValue {
                             withAnimation(.easeInOut(duration: 0.3)) {
@@ -237,8 +212,8 @@ struct VoiceConversationView: View {
                         Image(systemName: getHeaderIcon())
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(getHeaderColor())
-                            .scaleEffect(isCurrentlyRecording ? 1.2 : 1.0)
-                            .animation(.easeInOut(duration: 0.3), value: isCurrentlyRecording)
+                            .scaleEffect(speechRecognitionManager.isRecording ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: speechRecognitionManager.isRecording)
                         
                         Text("Live Conversation")
                             .font(.headline)
@@ -250,11 +225,7 @@ struct VoiceConversationView: View {
                     Button("Done") {
                         exitLiveMode()
                         textToSpeechManager.stopSpeaking()
-                        
-                        Task {
-                            try? await modernRecorder.stopRecording()
-                        }
-                        
+                        speechRecognitionManager.stopRecording()
                         dismiss()
                     }
                 }
@@ -271,10 +242,7 @@ struct VoiceConversationView: View {
         .onDisappear {
             exitLiveMode()
             textToSpeechManager.stopSpeaking()
-            
-            Task {
-                try? await modernRecorder.stopRecording()
-            }
+            speechRecognitionManager.stopRecording()
         }
         .onReceive(llm.$userLLMResponse) { streamingResponse in
             if let response = streamingResponse {
@@ -287,7 +255,7 @@ struct VoiceConversationView: View {
     // MARK: - Helper Methods for UI
     private func getHeaderIcon() -> String {
         if isInLiveMode {
-            if isCurrentlyRecording {
+            if speechRecognitionManager.isRecording {
                 return "waveform.circle.fill"
             } else if textToSpeechManager.isSpeaking {
                 return "speaker.wave.3.fill"
@@ -303,7 +271,7 @@ struct VoiceConversationView: View {
     
     private func getHeaderColor() -> Color {
         if isInLiveMode {
-            if isCurrentlyRecording {
+            if speechRecognitionManager.isRecording {
                 return .red
             } else if textToSpeechManager.isSpeaking {
                 return .green
@@ -319,7 +287,7 @@ struct VoiceConversationView: View {
     
     private func getStatusText() -> String {
         if isInLiveMode {
-            if isCurrentlyRecording {
+            if speechRecognitionManager.isRecording {
                 return "Listening for your voice..."
             } else if isWaitingForResponse {
                 return "Processing your request..."
@@ -335,152 +303,39 @@ struct VoiceConversationView: View {
     
     // MARK: - Live Mode Functions
     private func startLiveMode() {
-        print("🚀 [VoiceConversationView] Starting live mode")
-        
         isInLiveMode = true
         conversationHistory.removeAll()
         resetCurrentExchange()
         
         // Start the first listening session
         startListening()
-        print("✅ [VoiceConversationView] Live mode started")
     }
     
     private func exitLiveMode() {
         isInLiveMode = false
-        stopModernListening()
+        speechRecognitionManager.exitContinuousMode()
         textToSpeechManager.stopSpeaking()
         resetCurrentExchange()
     }
     
     private func startListening() {
-        print("🎧 [VoiceConversationView] Starting listening session")
-        
         userText = ""
         aiResponse = ""
         
-        print("🔊 [VoiceConversationView] Using modern STT framework")
-        startModernListening()
-    }
-    
-    private func startModernListening() {
-        print("🎤 [VoiceConversationView] Starting modern listening")
-        
-        // Reset transcription state
-        modernTranscriber.clearTranscribedText()
-        hasReceivedFirstTranscription = false
-        print("🧠 [VoiceConversationView] Cleared transcriber text and reset transcription state")
-        
-        // Play listening sound
-        AudioServicesPlaySystemSound(1113) // Tock sound
-        print("🔔 [VoiceConversationView] Played start sound")
-        
-        Task {
-            do {
-                print("🎤 [VoiceConversationView] Starting recorder...")
-                try await modernRecorder.record()
-                print("🛑 [VoiceConversationView] Recorder finished")
-            } catch {
-                print("❌ [VoiceConversationView] Modern recording failed: \(error)")
-            }
-        }
-        
-        // Monitor for transcribed text and silence - IMPROVED LOGIC
-        Task {
-            print("👀 [VoiceConversationView] Starting text monitoring loop")
-            var loopCount = 0
-            
-            while modernRecorder.isRecording {
-                loopCount += 1
-                let currentText = modernTranscriber.transcribedText
-                
-                if loopCount % 10 == 0 { // Log every 1 second
-                    print("👀 [VoiceConversationView] Loop \(loopCount): isRecording=\(modernRecorder.isRecording), currentText='\(currentText)', hasReceived1st=\(hasReceivedFirstTranscription)")
-                }
-                
-                if currentText != userText {
-                    print("📝 [VoiceConversationView] Text changed from '\(userText)' to '\(currentText)'")
-                    userText = currentText
-                    
-                    // If we have ANY text (not just meaningful text), we've received first transcription
-                    if !hasReceivedFirstTranscription && !currentText.isEmpty {
-                        hasReceivedFirstTranscription = true
-                        print("🎉 [VoiceConversationView] First transcription received! Starting silence monitoring")
-                        resetModernSilenceTimer()
-                    }
-                    // Reset timer on meaningful text changes after first transcription
-                    else if hasReceivedFirstTranscription && !currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        print("⏰ [VoiceConversationView] Meaningful text detected, resetting silence timer")
-                        lastSpeechTime = Date()
-                        resetModernSilenceTimer()
-                    }
-                }
-                
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-            }
-            
-            print("🛑 [VoiceConversationView] Text monitoring loop ended after \(loopCount) iterations")
-        }
-    }
-    
-    private func resetModernSilenceTimer() {
-        print("⏰ [VoiceConversationView] Resetting silence timer (\(silenceThreshold)s)")
-        
-        silenceTimer?.invalidate()
-        
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceThreshold, repeats: false) { _ in
-            print("⏰ [VoiceConversationView] Silence timer fired")
+        speechRecognitionManager.startContinuousRecording {
             Task { @MainActor in
-                if self.modernRecorder.isRecording {
-                    print("🔇 [VoiceConversationView] Silence detected, stopping listening")
-                    self.stopModernListening()
-                    self.onVoiceInputComplete()
-                } else {
-                    print("⚠️ [VoiceConversationView] Silence timer fired but not recording")
-                }
-            }
-        }
-    }
-    
-    private func stopModernListening() {
-        print("🛑 [VoiceConversationView] Stopping modern listening")
-        
-        silenceTimer?.invalidate()
-        silenceTimer = nil
-        print("⏰ [VoiceConversationView] Silence timer invalidated")
-        
-        // Play listening stop sound
-        AudioServicesPlaySystemSound(1114) // Tick sound
-        print("🔔 [VoiceConversationView] Played stop sound")
-        
-        Task {
-            do {
-                try await modernRecorder.stopRecording()
-                print("✅ [VoiceConversationView] Modern recorder stopped successfully")
-            } catch {
-                print("❌ [VoiceConversationView] Error stopping modern recorder: \(error)")
+                self.onVoiceInputComplete()
             }
         }
     }
     
     private func onVoiceInputComplete() {
-        print("✅ [VoiceConversationView] Voice input complete")
+        guard isInLiveMode, !speechRecognitionManager.recognizedText.isEmpty else { return }
         
-        let transcribedText = modernTranscriber.transcribedText
-        print("🎤 [VoiceConversationView] Transcribed: '\(transcribedText)'")
-        
-        guard isInLiveMode, !transcribedText.isEmpty else { 
-            print("⚠️ [VoiceConversationView] Skipping - not in live mode or empty text. LiveMode: \(isInLiveMode), Text: '\(transcribedText)'")
-            return 
-        }
-        
-        userText = transcribedText
-        modernTranscriber.clearTranscribedText()
-        print("🧠 [VoiceConversationView] Cleared transcriber text")
-        print("💬 [VoiceConversationView] Set userText to: '\(userText)'")
+        userText = speechRecognitionManager.recognizedText
+        speechRecognitionManager.clearRecognizedText()
         
         Task {
-            print("🤖 [VoiceConversationView] Querying LLM...")
             await queryLLMInLiveMode()
         }
     }
