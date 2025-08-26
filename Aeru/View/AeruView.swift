@@ -106,6 +106,7 @@ struct AeruView: View {
                             .font(.body)
                             .foregroundColor(.secondary)
                             .padding(.horizontal, 5)
+                            .padding(.top, 8)
                             .allowsHitTesting(false)
                     }
                 }
@@ -134,11 +135,10 @@ struct AeruView: View {
                 .disabled(isModelResponding)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 6)
             .glassEffect(.regular.interactive())
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
     
     private func updateInputHeight() {
