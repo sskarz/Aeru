@@ -81,11 +81,6 @@ struct AeruView: View {
                         } else {
                             emptyStateView
                         }
-                        
-                        // Input area
-                        if sessionManager.currentSession != nil {
-                            inputView
-                        }
                     }
                     .navigationTitle(sessionManager.currentSession?.displayTitle ?? "Aeru")
                     .navigationBarTitleDisplayMode(.inline)
@@ -113,6 +108,96 @@ struct AeruView: View {
                                     Image(systemName: "plus.message")
                                         .font(.title3)
                                         .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                        
+                        if sessionManager.currentSession != nil {
+                            // Document upload button
+                            ToolbarItem(placement: .bottomBar) {
+                                Button(action: { 
+                                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                    impactFeedback.impactOccurred()
+                                    showKnowledgeBase.toggle() 
+                                }) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.blue)
+                                        .frame(width: 40, height: 40)
+                                }
+                            }
+                            ToolbarSpacer(placement: .bottomBar)
+                            
+                            // Text input
+                            ToolbarItem(placement: .bottomBar) {
+                                TextField("Type a message...", text: $messageText, axis: .vertical)
+                                    .textFieldStyle(.plain)
+                                    .focused($isMessageFieldFocused)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                                    .lineLimit(1...2)
+                                    .textInputAutocapitalization(.sentences)
+                                    .disableAutocorrection(false)
+                            }
+                            ToolbarSpacer(placement: .bottomBar)
+                            
+//                            // Voice input button
+//                            ToolbarItem(placement: .bottomBar) {
+//                                Button(action: {
+//                                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+//                                    impactFeedback.impactOccurred()
+//                                    handleVoiceButtonTap()
+//                                }) {
+//                                    Image(systemName: speechRecognitionManager.isRecording ? "mic.fill" : "mic")
+//                                        .font(.system(size: 16, weight: .medium))
+//                                        .foregroundColor(speechRecognitionManager.isRecording ? .red : .blue)
+//                                        .frame(width: 40, height: 40)
+//                                        .background(
+//                                            Circle()
+//                                                .fill(speechRecognitionManager.isRecording ? 
+//                                                      Color.red.opacity(0.1) : Color.clear
+//                                        ))
+//                                }
+//                                .disabled(isModelResponding)
+//                            }
+//                            ToolbarSpacer(placement: .bottomBar)
+                            
+                            // Send button OR Voice Conversation button
+                            ToolbarItem(placement: .bottomBar) {
+                                if messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    Button(action: {
+                                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                        impactFeedback.impactOccurred()
+                                        speechRecognitionManager.stopRecording()
+                                        startInstantVoiceConversation()
+                                    }) {
+                                        Image(systemName: "waveform")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.white)
+                                            .frame(width: 40, height: 40)
+                                            .background(
+                                                Circle()
+                                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                                            )
+                                    }
+                                    .disabled(isModelResponding)
+                                } else {
+                                    Button(action: {
+                                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                        impactFeedback.impactOccurred()
+                                        sendMessage()
+                                    }) {
+                                        Image(systemName: "arrow.up")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.white)
+                                            .frame(width: 40, height: 40)
+                                            .background(
+                                                Circle()
+                                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                                            )
+                                    }
+                                    .disabled(isModelResponding)
                                 }
                             }
                         }
@@ -378,105 +463,6 @@ struct AeruView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    private var inputView: some View {
-        VStack(spacing: 12) {
-            // Upload button, text input, voice button and send button
-            HStack(spacing: 12) {
-                // Document upload button
-                Button(action: { 
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
-                    showKnowledgeBase.toggle() 
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.blue)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(Color(.systemGray6))
-                        )
-                }
-                .glassEffect(.regular.interactive())
-                
-                TextField("Type a message...", text: $messageText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .focused($isMessageFieldFocused)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .lineLimit(1...2)
-                    .textInputAutocapitalization(.sentences)
-                    .disableAutocorrection(false)
-                    .glassEffect(.regular.interactive())
-                
-                // Voice input button
-                Button(action: {
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
-                    handleVoiceButtonTap()
-                }) {
-                    Image(systemName: speechRecognitionManager.isRecording ? "mic.fill" : "mic")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(speechRecognitionManager.isRecording ? .red : .blue)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(speechRecognitionManager.isRecording ? 
-                                      Color.red.opacity(0.1) : Color(.systemGray6))
-                        )
-                }
-                .disabled(isModelResponding)
-                .glassEffect(.regular.interactive())
-                
-                // Send button OR Voice Conversation button based on text content
-                if messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    // Voice Conversation button when no text
-                    Button(action: {
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                        impactFeedback.impactOccurred()
-                        // Stop any ongoing recording and start live voice conversation immediately
-                        speechRecognitionManager.stopRecording()
-                        startInstantVoiceConversation()
-                    }) {
-                        Image(systemName: "waveform")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                Circle()
-                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
-                            )
-                    }
-                    .disabled(isModelResponding)
-                    .glassEffect(.regular.interactive())
-                } else {
-                    // Send button when there is text
-                    Button(action: {
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                        impactFeedback.impactOccurred()
-                        sendMessage()
-                    }) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                Circle()
-                                    .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
-                            )
-                    }
-                    .disabled(isModelResponding)
-                    .glassEffect(.regular.interactive())
-                }
-            }
-            
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color(.systemBackground))
-    }
     
     private func handleVoiceButtonTap() {
         if speechRecognitionManager.isRecording {
@@ -913,23 +899,6 @@ struct KnowledgeBaseView: View {
                         }
                     }
                 }
-                // Knowledge based entries
-//                if !llm.getRagNeighbors(for: session).isEmpty {
-//                    VStack(alignment: .leading, spacing: 8) {
-//                        Text("Knowledge Base Entries")
-//                            .font(.headline)
-//                        
-//                        List(llm.getRagNeighbors(for: session), id: \.0) { neighbor in
-//                            VStack(alignment: .leading, spacing: 4) {
-//                                Text(neighbor.0)
-//                                    .font(.body)
-//                                Text("Similarity: \(String(format: "%.3f", neighbor.1))")
-//                                    .font(.caption)
-//                            }
-//                        }
-//                    }
-//                }
-//                
                 Spacer()
             }
             .padding()
