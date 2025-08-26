@@ -172,6 +172,7 @@ struct AeruView: View {
                     .safeAreaInset(edge: .bottom) {
                         if sessionManager.currentSession != nil {
                             inputBar
+                                .padding(.bottom, 8)
                         }
                     }
                 }
