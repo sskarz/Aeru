@@ -26,20 +26,8 @@ struct VoiceConversationView: View {
     @State private var hasReceivedFirstTranscription = false
     private let silenceThreshold: TimeInterval = 1.5
     
-    private var useModernFramework: Bool {
-        if #available(iOS 26.0, *) {
-            return true
-        } else {
-            return false
-        }
-    }
-    
     private var isCurrentlyRecording: Bool {
-        if useModernFramework {
-            return modernRecorder.isRecording
-        } else {
-            return speechRecognitionManager.isRecording
-        }
+        return modernRecorder.isRecording
     }
     
     init(llm: LLM, speechRecognitionManager: SpeechRecognitionManager, textToSpeechManager: TextToSpeechManager, currentSession: ChatSession, sessionManager: ChatSessionManager) {
@@ -263,12 +251,8 @@ struct VoiceConversationView: View {
                         exitLiveMode()
                         textToSpeechManager.stopSpeaking()
                         
-                        if useModernFramework {
-                            Task {
-                                try? await modernRecorder.stopRecording()
-                            }
-                        } else {
-                            speechRecognitionManager.stopRecording()
+                        Task {
+                            try? await modernRecorder.stopRecording()
                         }
                         
                         dismiss()
@@ -288,12 +272,8 @@ struct VoiceConversationView: View {
             exitLiveMode()
             textToSpeechManager.stopSpeaking()
             
-            if useModernFramework {
-                Task {
-                    try? await modernRecorder.stopRecording()
-                }
-            } else {
-                speechRecognitionManager.stopRecording()
+            Task {
+                try? await modernRecorder.stopRecording()
             }
         }
         .onReceive(llm.$userLLMResponse) { streamingResponse in
@@ -356,7 +336,6 @@ struct VoiceConversationView: View {
     // MARK: - Live Mode Functions
     private func startLiveMode() {
         print("🚀 [VoiceConversationView] Starting live mode")
-        print("📱 [VoiceConversationView] Using modern framework: \(useModernFramework)")
         
         isInLiveMode = true
         conversationHistory.removeAll()
@@ -369,13 +348,7 @@ struct VoiceConversationView: View {
     
     private func exitLiveMode() {
         isInLiveMode = false
-        
-        if useModernFramework {
-            stopModernListening()
-        } else {
-            speechRecognitionManager.exitContinuousMode()
-        }
-        
+        stopModernListening()
         textToSpeechManager.stopSpeaking()
         resetCurrentExchange()
     }
@@ -386,17 +359,8 @@ struct VoiceConversationView: View {
         userText = ""
         aiResponse = ""
         
-        if useModernFramework {
-            print("🔊 [VoiceConversationView] Using modern STT framework")
-            startModernListening()
-        } else {
-            print("🔊 [VoiceConversationView] Using legacy STT framework")
-            speechRecognitionManager.startContinuousRecording {
-                Task { @MainActor in
-                    self.onVoiceInputComplete()
-                }
-            }
-        }
+        print("🔊 [VoiceConversationView] Using modern STT framework")
+        startModernListening()
     }
     
     private func startModernListening() {
@@ -502,35 +466,17 @@ struct VoiceConversationView: View {
     private func onVoiceInputComplete() {
         print("✅ [VoiceConversationView] Voice input complete")
         
-        let recognizedText: String
+        let transcribedText = modernTranscriber.transcribedText
+        print("🎤 [VoiceConversationView] Transcribed: '\(transcribedText)'")
         
-        if useModernFramework {
-            let transcribedText = modernTranscriber.transcribedText
-            print("🎤 [VoiceConversationView] Modern framework - transcribed: '\(transcribedText)'")
-            
-            guard isInLiveMode, !transcribedText.isEmpty else { 
-                print("⚠️ [VoiceConversationView] Skipping - not in live mode or empty text. LiveMode: \(isInLiveMode), Text: '\(transcribedText)'")
-                return 
-            }
-            
-            recognizedText = transcribedText
-            modernTranscriber.clearTranscribedText()
-            print("🧠 [VoiceConversationView] Cleared modern transcriber text")
-        } else {
-            let speechText = speechRecognitionManager.recognizedText
-            print("🎤 [VoiceConversationView] Legacy framework - recognized: '\(speechText)'")
-            
-            guard isInLiveMode, !speechText.isEmpty else { 
-                print("⚠️ [VoiceConversationView] Skipping - not in live mode or empty text. LiveMode: \(isInLiveMode), Text: '\(speechText)'")
-                return 
-            }
-            
-            recognizedText = speechText
-            speechRecognitionManager.clearRecognizedText()
-            print("🧠 [VoiceConversationView] Cleared legacy recognizer text")
+        guard isInLiveMode, !transcribedText.isEmpty else { 
+            print("⚠️ [VoiceConversationView] Skipping - not in live mode or empty text. LiveMode: \(isInLiveMode), Text: '\(transcribedText)'")
+            return 
         }
         
-        userText = recognizedText
+        userText = transcribedText
+        modernTranscriber.clearTranscribedText()
+        print("🧠 [VoiceConversationView] Cleared transcriber text")
         print("💬 [VoiceConversationView] Set userText to: '\(userText)'")
         
         Task {
