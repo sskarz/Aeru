@@ -33,7 +33,7 @@ struct ChatSidebar: View {
                             selectedSessions.removeAll()
                         }
                         .font(.body)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.primary)
                         
                         Spacer()
                         
@@ -67,7 +67,7 @@ struct ChatSidebar: View {
                         }) {
                             Image(systemName: "plus.message")
                                 .font(.title3)
-                                .foregroundColor(.blue)
+                                .foregroundColor(.primary)
                                 .frame(width: 24, height: 24)
                         }
                     }
@@ -130,11 +130,11 @@ struct ChatSidebar: View {
                         HStack {
                             Image(systemName: "gear")
                                 .font(.title3)
-                                .foregroundColor(.blue)
+                                .foregroundColor(.primary)
                             
                             Text("Settings")
                                 .font(.body)
-                                .foregroundColor(.blue)
+                                .foregroundColor(.primary)
                         }
                     }
                     .buttonStyle(.plain)
@@ -148,7 +148,7 @@ struct ChatSidebar: View {
                     }) {
                         Image(systemName: "checkmark.circle")
                             .font(.title3)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.primary)
                             .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.plain)

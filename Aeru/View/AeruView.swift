@@ -80,7 +80,7 @@ struct AeruView: View {
             }) {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .frame(width: 36, height: 36)
                     .glassEffect(.regular.interactive())
             }
@@ -149,7 +149,7 @@ struct AeruView: View {
                             }) {
                                 Image(systemName: "line.3.horizontal")
                                     .font(.title3)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.primary)
                             }
                         }
                         
@@ -162,7 +162,7 @@ struct AeruView: View {
                                 }) {
                                     Image(systemName: "plus.message")
                                         .font(.title3)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.primary)
                                 }
                             }
                         }
