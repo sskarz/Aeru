@@ -10,123 +10,142 @@ class SpokenWordTranscriber: ObservableObject {
     @Published var hasError = false
     @Published var errorMessage = ""
     
-    private var analyzer: SpeechAnalyzer?
-    private var transcriber: SpeechTranscriber?
+    private var inputSequence: AsyncStream<AnalyzerInput>?
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
-    private var transcriptionTask: Task<Void, Never>?
-    private var audioFormat: AVAudioFormat?
+    private var transcriber: SpeechTranscriber?
+    private var analyzer: SpeechAnalyzer?
+    private var recognizerTask: Task<(), Error>?
+    
+    var analyzerFormat: AVAudioFormat?
+    var converter = BufferConverter()
     
     private let locale: Locale
     
-    init(locale: Locale = Locale(identifier: "en-US")) {
+    init(locale: Locale = Locale.current) {
         self.locale = locale
     }
     
     func setUpTranscriber() async throws {
-        guard let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
-            throw TranscriptionError.unsupportedLocale
-        }
+        print("🎤 [SpokenWordTranscriber] Starting setup for locale: \(locale)")
         
-        transcriber = SpeechTranscriber(locale: Locale.current,
+        transcriber = SpeechTranscriber(locale: locale,
                                         transcriptionOptions: [],
                                         reportingOptions: [.volatileResults],
                                         attributeOptions: [.audioTimeRange])
         
         guard let transcriber = transcriber else {
+            print("❌ [SpokenWordTranscriber] Failed to create transcriber")
             throw TranscriptionError.transcriber
         }
-        
-        if let installationRequest = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            try await installationRequest.downloadAndInstall()
-        }
-        
-        audioFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
-        
-        let (inputSequence, inputBuilder) = AsyncStream.makeStream(of: AnalyzerInput.self)
-        self.inputBuilder = inputBuilder
+        print("✅ [SpokenWordTranscriber] Transcriber created successfully")
         
         analyzer = SpeechAnalyzer(modules: [transcriber])
+        print("🧠 [SpokenWordTranscriber] Analyzer created")
         
-        await startTranscriptionTask(transcriber: transcriber)
+        do {
+            try await ensureModel(transcriber: transcriber, locale: locale)
+            print("✅ [SpokenWordTranscriber] Model ensured")
+        } catch let error as TranscriptionError {
+            print("❌ [SpokenWordTranscriber] Model error: \(error)")
+            throw error
+        }
         
-        try await analyzer?.start(inputSequence: inputSequence)
+        analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+        print("🎵 [SpokenWordTranscriber] Audio format: \(analyzerFormat?.description ?? "nil")")
         
-        isTranscribing = true
-    }
-    
-    private func startTranscriptionTask(transcriber: SpeechTranscriber) async {
-        transcriptionTask = Task {
+        let (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
+        self.inputSequence = inputSequence
+        self.inputBuilder = inputBuilder
+        print("📡 [SpokenWordTranscriber] Input stream created")
+        
+        // Start the recognition task - this is the key part Apple does differently!
+        recognizerTask = Task {
+            print("📝 [SpokenWordTranscriber] Starting recognition task")
             do {
                 for try await result in transcriber.results {
-                    let bestTranscription = result.text
-                    let plainTextTranscription = String(bestTranscription.characters)
+                    let text = result.text
+                    let plainText = String(text.characters)
+                    print("🗣️ [SpokenWordTranscriber] New transcription result: '\(plainText)' (isFinal: \(result.isFinal))")
                     
                     await MainActor.run {
-                        self.transcribedText = plainTextTranscription
+                        if result.isFinal {
+                            print("✅ [SpokenWordTranscriber] Final result: '\(plainText)'")
+                            self.transcribedText = plainText
+                        } else {
+                            print("🔄 [SpokenWordTranscriber] Partial result: '\(plainText)'")
+                            self.transcribedText = plainText
+                        }
                     }
                 }
+                print("⚠️ [SpokenWordTranscriber] Recognition results stream ended")
             } catch {
+                print("❌ [SpokenWordTranscriber] Recognition task error: \(error)")
                 await MainActor.run {
-                    self.showError("Transcription error: \(error.localizedDescription)")
+                    self.showError("Recognition failed: \(error.localizedDescription)")
                 }
             }
         }
+        
+        try await analyzer?.start(inputSequence: inputSequence)
+        print("🚀 [SpokenWordTranscriber] Analyzer started")
+        
+        isTranscribing = true
+        print("✅ [SpokenWordTranscriber] Setup complete - isTranscribing: \(isTranscribing)")
     }
     
     func streamAudioToTranscriber(_ buffer: AVAudioPCMBuffer) async throws {
-        guard let audioFormat = audioFormat,
-              let inputBuilder = inputBuilder else {
+        guard let inputBuilder = inputBuilder,
+              let analyzerFormat = analyzerFormat else {
+            print("❌ [SpokenWordTranscriber] Not set up - inputBuilder: \(inputBuilder != nil), analyzerFormat: \(analyzerFormat != nil)")
             throw TranscriptionError.notSetUp
         }
         
-        let convertedBuffer: AVAudioPCMBuffer
+        print("🎵 [SpokenWordTranscriber] Received audio buffer - frameLength: \(buffer.frameLength)")
         
-        if buffer.format == audioFormat {
-            convertedBuffer = buffer
-        } else {
-            guard let converter = AVAudioConverter(from: buffer.format, to: audioFormat),
-                  let outputBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: buffer.frameLength) else {
-                throw TranscriptionError.audioConversion
-            }
+        do {
+            let converted = try converter.convertBuffer(buffer, to: analyzerFormat)
+            print("🔄 [SpokenWordTranscriber] Buffer converted successfully")
             
-            var error: NSError?
-            converter.convert(to: outputBuffer, error: &error) { _, _ in
-                return buffer
-            }
-            
-            if let error = error {
-                throw TranscriptionError.audioConversion
-            }
-            
-            convertedBuffer = outputBuffer
+            let input = AnalyzerInput(buffer: converted)
+            inputBuilder.yield(input)
+            print("📡 [SpokenWordTranscriber] Audio buffer sent to analyzer")
+        } catch let converterError as BufferConverter.Error {
+            print("❌ [SpokenWordTranscriber] Buffer conversion failed: \(converterError)")
+            throw TranscriptionError.audioConversion
+        } catch {
+            print("❌ [SpokenWordTranscriber] Unexpected conversion error: \(error)")
+            throw TranscriptionError.audioConversion
         }
-        
-        let input = AnalyzerInput(buffer: convertedBuffer)
-        inputBuilder.yield(input)
     }
     
     func finishTranscribing() async throws {
+        print("🛑 [SpokenWordTranscriber] Finishing transcription")
+        
         inputBuilder?.finish()
         inputBuilder = nil
+        print("📡 [SpokenWordTranscriber] Input stream finished")
         
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
+        try await analyzer?.finalizeAndFinishThroughEndOfInput()
+        print("🧠 [SpokenWordTranscriber] Analyzer finalized")
         
-        if let analyzer = analyzer {
-            try await analyzer.finalizeAndFinishThroughEndOfInput()
-        }
+        recognizerTask?.cancel()
+        recognizerTask = nil
+        print("📝 [SpokenWordTranscriber] Recognition task cancelled")
         
         isTranscribing = false
         analyzer = nil
         transcriber = nil
+        print("✅ [SpokenWordTranscriber] Cleanup complete - isTranscribing: \(isTranscribing)")
     }
     
     func cancelTranscription() async {
+        print("🛑 [SpokenWordTranscriber] Cancelling transcription")
+        
         inputBuilder?.finish()
         inputBuilder = nil
         
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
+        recognizerTask?.cancel()
+        recognizerTask = nil
         
         if let analyzer = analyzer {
             await analyzer.cancelAndFinishNow()
@@ -135,6 +154,7 @@ class SpokenWordTranscriber: ObservableObject {
         isTranscribing = false
         analyzer = nil
         transcriber = nil
+        print("✅ [SpokenWordTranscriber] Cancellation complete")
     }
     
     private func showError(_ message: String) {
@@ -152,6 +172,52 @@ class SpokenWordTranscriber: ObservableObject {
         transcribedText = ""
     }
 }
+
+// MARK: - Model Management (Apple's pattern)
+extension SpokenWordTranscriber {
+    func ensureModel(transcriber: SpeechTranscriber, locale: Locale) async throws {
+        print("📥 [SpokenWordTranscriber] Ensuring model for locale: \(locale)")
+        
+        guard await supported(locale: locale) else {
+            print("❌ [SpokenWordTranscriber] Locale not supported: \(locale)")
+            throw TranscriptionError.localeNotSupported
+        }
+        print("✅ [SpokenWordTranscriber] Locale supported: \(locale)")
+        
+        if await installed(locale: locale) {
+            print("✅ [SpokenWordTranscriber] Model already installed")
+            return
+        } else {
+            print("📥 [SpokenWordTranscriber] Model not installed, downloading...")
+            try await downloadIfNeeded(for: transcriber)
+        }
+    }
+    
+    func supported(locale: Locale) async -> Bool {
+        let supported = await SpeechTranscriber.supportedLocales
+        let isSupported = supported.map { $0.identifier(.bcp47) }.contains(locale.identifier(.bcp47))
+        print("🌍 [SpokenWordTranscriber] Locale \(locale) supported: \(isSupported)")
+        return isSupported
+    }
+
+    func installed(locale: Locale) async -> Bool {
+        let installed = await Set(SpeechTranscriber.installedLocales)
+        let isInstalled = installed.map { $0.identifier(.bcp47) }.contains(locale.identifier(.bcp47))
+        print("💾 [SpokenWordTranscriber] Locale \(locale) installed: \(isInstalled)")
+        return isInstalled
+    }
+
+    func downloadIfNeeded(for module: SpeechTranscriber) async throws {
+        if let downloader = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
+            print("📥 [SpokenWordTranscriber] Starting asset download...")
+            try await downloader.downloadAndInstall()
+            print("✅ [SpokenWordTranscriber] Asset download complete")
+        } else {
+            print("✅ [SpokenWordTranscriber] No download needed")
+        }
+    }
+}
+
 
 enum TranscriptionError: LocalizedError {
     case couldNotDownloadModel

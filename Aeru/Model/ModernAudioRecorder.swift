@@ -52,45 +52,96 @@ class ModernAudioRecorder: ObservableObject {
     }
     
     func record() async throws {
+        print("🎤 [ModernAudioRecorder] Starting recording...")
+        
         // Check authorization first
         guard await isAuthorized() else {
+            print("❌ [ModernAudioRecorder] Not authorized")
             showError("Microphone permission not granted")
             return
         }
+        print("✅ [ModernAudioRecorder] Microphone authorized")
         
         guard !audioEngine.isRunning else {
+            print("⚠️ [ModernAudioRecorder] Audio engine already running")
             return
         }
         
         isRecording = true
         hasError = false
+        print("🔴 [ModernAudioRecorder] Recording state set to true")
         
         #if os(iOS)
-        try setUpAudioSession()
+        do {
+            try setUpAudioSession()
+            print("🔊 [ModernAudioRecorder] Audio session configured")
+        } catch {
+            print("❌ [ModernAudioRecorder] Audio session setup failed: \(error)")
+            throw error
+        }
         #endif
         
-        try await transcriber.setUpTranscriber()
-        
-        for await input in try await audioStream() {
-            try await transcriber.streamAudioToTranscriber(input)
+        do {
+            try await transcriber.setUpTranscriber()
+            print("🎤 [ModernAudioRecorder] Transcriber setup complete")
+        } catch {
+            print("❌ [ModernAudioRecorder] Transcriber setup failed: \(error)")
+            throw error
         }
+        
+        print("🎵 [ModernAudioRecorder] Starting audio stream...")
+        for await input in try await audioStream() {
+            do {
+                try await transcriber.streamAudioToTranscriber(input)
+            } catch {
+                print("❌ [ModernAudioRecorder] Failed to stream audio to transcriber: \(error)")
+                throw error
+            }
+        }
+        print("🛑 [ModernAudioRecorder] Audio stream ended")
     }
     
     func isAuthorized() async -> Bool {
-        if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
+        let currentStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        print("🔐 [ModernAudioRecorder] Current auth status: \(currentStatus.rawValue)")
+        
+        if currentStatus == .authorized {
+            print("✅ [ModernAudioRecorder] Already authorized")
             return true
         }
         
-        return await AVCaptureDevice.requestAccess(for: .audio)
+        print("🔐 [ModernAudioRecorder] Requesting audio access...")
+        let granted = await AVCaptureDevice.requestAccess(for: .audio)
+        print("🔐 [ModernAudioRecorder] Access granted: \(granted)")
+        return granted
     }
     
     func stopRecording() async throws {
+        print("🛑 [ModernAudioRecorder] Stopping recording...")
+        
         audioEngine.stop()
+        print("⏹️ [ModernAudioRecorder] Audio engine stopped")
+        
         isRecording = false
+        print("🔴 [ModernAudioRecorder] Recording state set to false")
         
-        try await transcriber.finishTranscribing()
+        do {
+            try await transcriber.finishTranscribing()
+            print("🎤 [ModernAudioRecorder] Transcriber finished")
+        } catch {
+            print("❌ [ModernAudioRecorder] Error finishing transcriber: \(error)")
+            throw error
+        }
         
-        try deactivateAudioSession()
+        do {
+            try deactivateAudioSession()
+            print("🔊 [ModernAudioRecorder] Audio session deactivated")
+        } catch {
+            print("❌ [ModernAudioRecorder] Error deactivating audio session: \(error)")
+            throw error
+        }
+        
+        print("✅ [ModernAudioRecorder] Stop recording complete")
     }
     
     func pauseRecording() {
@@ -119,31 +170,54 @@ class ModernAudioRecorder: ObservableObject {
     #endif
     
     private func audioStream() async throws -> AsyncStream<AVAudioPCMBuffer> {
+        print("🎵 [ModernAudioRecorder] Setting up audio stream")
+        
         try setupAudioEngine()
+        print("⚙️ [ModernAudioRecorder] Audio engine setup complete")
+        
+        let inputFormat = audioEngine.inputNode.outputFormat(forBus: 0)
+        print("🎵 [ModernAudioRecorder] Input format: \(inputFormat)")
         
         audioEngine.inputNode.installTap(
             onBus: 0,
             bufferSize: 4096,
-            format: audioEngine.inputNode.outputFormat(forBus: 0)
+            format: inputFormat
         ) { [weak self] buffer, time in
             guard let self = self else { return }
+            print("🎵 [ModernAudioRecorder] Received audio buffer - frameLength: \(buffer.frameLength)")
             self.writeBufferToDisk(buffer: buffer)
             self.outputContinuation?.yield(buffer)
         }
+        print("🎵 [ModernAudioRecorder] Audio tap installed")
         
         audioEngine.prepare()
+        print("⚙️ [ModernAudioRecorder] Audio engine prepared")
+        
         try audioEngine.start()
+        print("🚀 [ModernAudioRecorder] Audio engine started")
         
         return AsyncStream(AVAudioPCMBuffer.self, bufferingPolicy: .unbounded) { continuation in
+            print("📡 [ModernAudioRecorder] Audio stream created")
             outputContinuation = continuation
         }
     }
     
     private func setupAudioEngine() throws {
+        print("⚙️ [ModernAudioRecorder] Setting up audio engine")
+        
         let inputSettings = audioEngine.inputNode.inputFormat(forBus: 0).settings
-        file = try AVAudioFile(forWriting: url, settings: inputSettings)
+        print("📊 [ModernAudioRecorder] Input settings: \(inputSettings)")
+        
+        do {
+            file = try AVAudioFile(forWriting: url, settings: inputSettings)
+            print("📁 [ModernAudioRecorder] Audio file created at: \(url)")
+        } catch {
+            print("❌ [ModernAudioRecorder] Failed to create audio file: \(error)")
+            throw error
+        }
         
         audioEngine.inputNode.removeTap(onBus: 0)
+        print("🔇 [ModernAudioRecorder] Previous tap removed")
     }
     
     private func writeBufferToDisk(buffer: AVAudioPCMBuffer) {

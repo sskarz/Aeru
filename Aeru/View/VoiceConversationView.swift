@@ -23,6 +23,7 @@ struct VoiceConversationView: View {
     @StateObject private var modernRecorder: ModernAudioRecorder
     @State private var silenceTimer: Timer?
     @State private var lastSpeechTime: Date?
+    @State private var hasReceivedFirstTranscription = false
     private let silenceThreshold: TimeInterval = 1.5
     
     private var useModernFramework: Bool {
@@ -354,12 +355,16 @@ struct VoiceConversationView: View {
     
     // MARK: - Live Mode Functions
     private func startLiveMode() {
+        print("🚀 [VoiceConversationView] Starting live mode")
+        print("📱 [VoiceConversationView] Using modern framework: \(useModernFramework)")
+        
         isInLiveMode = true
         conversationHistory.removeAll()
         resetCurrentExchange()
         
         // Start the first listening session
         startListening()
+        print("✅ [VoiceConversationView] Live mode started")
     }
     
     private func exitLiveMode() {
@@ -376,12 +381,16 @@ struct VoiceConversationView: View {
     }
     
     private func startListening() {
+        print("🎧 [VoiceConversationView] Starting listening session")
+        
         userText = ""
         aiResponse = ""
         
         if useModernFramework {
+            print("🔊 [VoiceConversationView] Using modern STT framework")
             startModernListening()
         } else {
+            print("🔊 [VoiceConversationView] Using legacy STT framework")
             speechRecognitionManager.startContinuousRecording {
                 Task { @MainActor in
                     self.onVoiceInputComplete()
@@ -391,30 +400,53 @@ struct VoiceConversationView: View {
     }
     
     private func startModernListening() {
-        // Clear previous text
+        print("🎤 [VoiceConversationView] Starting modern listening")
+        
+        // Reset transcription state
         modernTranscriber.clearTranscribedText()
+        hasReceivedFirstTranscription = false
+        print("🧠 [VoiceConversationView] Cleared transcriber text and reset transcription state")
         
         // Play listening sound
         AudioServicesPlaySystemSound(1113) // Tock sound
+        print("🔔 [VoiceConversationView] Played start sound")
         
         Task {
             do {
+                print("🎤 [VoiceConversationView] Starting recorder...")
                 try await modernRecorder.record()
+                print("🛑 [VoiceConversationView] Recorder finished")
             } catch {
-                print("Modern recording failed: \(error)")
+                print("❌ [VoiceConversationView] Modern recording failed: \(error)")
             }
         }
         
-        // Monitor for transcribed text and silence
+        // Monitor for transcribed text and silence - IMPROVED LOGIC
         Task {
+            print("👀 [VoiceConversationView] Starting text monitoring loop")
+            var loopCount = 0
+            
             while modernRecorder.isRecording {
+                loopCount += 1
                 let currentText = modernTranscriber.transcribedText
                 
+                if loopCount % 10 == 0 { // Log every 1 second
+                    print("👀 [VoiceConversationView] Loop \(loopCount): isRecording=\(modernRecorder.isRecording), currentText='\(currentText)', hasReceived1st=\(hasReceivedFirstTranscription)")
+                }
+                
                 if currentText != userText {
+                    print("📝 [VoiceConversationView] Text changed from '\(userText)' to '\(currentText)'")
                     userText = currentText
                     
-                    // Update last speech time if we have meaningful text
-                    if !currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    // If we have ANY text (not just meaningful text), we've received first transcription
+                    if !hasReceivedFirstTranscription && !currentText.isEmpty {
+                        hasReceivedFirstTranscription = true
+                        print("🎉 [VoiceConversationView] First transcription received! Starting silence monitoring")
+                        resetModernSilenceTimer()
+                    }
+                    // Reset timer on meaningful text changes after first transcription
+                    else if hasReceivedFirstTranscription && !currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        print("⏰ [VoiceConversationView] Meaningful text detected, resetting silence timer")
                         lastSpeechTime = Date()
                         resetModernSilenceTimer()
                     }
@@ -422,50 +454,87 @@ struct VoiceConversationView: View {
                 
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             }
+            
+            print("🛑 [VoiceConversationView] Text monitoring loop ended after \(loopCount) iterations")
         }
     }
     
     private func resetModernSilenceTimer() {
+        print("⏰ [VoiceConversationView] Resetting silence timer (\(silenceThreshold)s)")
+        
         silenceTimer?.invalidate()
         
         silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceThreshold, repeats: false) { _ in
+            print("⏰ [VoiceConversationView] Silence timer fired")
             Task { @MainActor in
                 if self.modernRecorder.isRecording {
+                    print("🔇 [VoiceConversationView] Silence detected, stopping listening")
                     self.stopModernListening()
                     self.onVoiceInputComplete()
+                } else {
+                    print("⚠️ [VoiceConversationView] Silence timer fired but not recording")
                 }
             }
         }
     }
     
     private func stopModernListening() {
+        print("🛑 [VoiceConversationView] Stopping modern listening")
+        
         silenceTimer?.invalidate()
         silenceTimer = nil
+        print("⏰ [VoiceConversationView] Silence timer invalidated")
         
         // Play listening stop sound
         AudioServicesPlaySystemSound(1114) // Tick sound
+        print("🔔 [VoiceConversationView] Played stop sound")
         
         Task {
-            try? await modernRecorder.stopRecording()
+            do {
+                try await modernRecorder.stopRecording()
+                print("✅ [VoiceConversationView] Modern recorder stopped successfully")
+            } catch {
+                print("❌ [VoiceConversationView] Error stopping modern recorder: \(error)")
+            }
         }
     }
     
     private func onVoiceInputComplete() {
+        print("✅ [VoiceConversationView] Voice input complete")
+        
         let recognizedText: String
         
         if useModernFramework {
-            guard isInLiveMode, !modernTranscriber.transcribedText.isEmpty else { return }
-            recognizedText = modernTranscriber.transcribedText
+            let transcribedText = modernTranscriber.transcribedText
+            print("🎤 [VoiceConversationView] Modern framework - transcribed: '\(transcribedText)'")
+            
+            guard isInLiveMode, !transcribedText.isEmpty else { 
+                print("⚠️ [VoiceConversationView] Skipping - not in live mode or empty text. LiveMode: \(isInLiveMode), Text: '\(transcribedText)'")
+                return 
+            }
+            
+            recognizedText = transcribedText
             modernTranscriber.clearTranscribedText()
+            print("🧠 [VoiceConversationView] Cleared modern transcriber text")
         } else {
-            guard isInLiveMode, !speechRecognitionManager.recognizedText.isEmpty else { return }
-            recognizedText = speechRecognitionManager.recognizedText
+            let speechText = speechRecognitionManager.recognizedText
+            print("🎤 [VoiceConversationView] Legacy framework - recognized: '\(speechText)'")
+            
+            guard isInLiveMode, !speechText.isEmpty else { 
+                print("⚠️ [VoiceConversationView] Skipping - not in live mode or empty text. LiveMode: \(isInLiveMode), Text: '\(speechText)'")
+                return 
+            }
+            
+            recognizedText = speechText
             speechRecognitionManager.clearRecognizedText()
+            print("🧠 [VoiceConversationView] Cleared legacy recognizer text")
         }
         
         userText = recognizedText
+        print("💬 [VoiceConversationView] Set userText to: '\(userText)'")
         
         Task {
+            print("🤖 [VoiceConversationView] Querying LLM...")
             await queryLLMInLiveMode()
         }
     }

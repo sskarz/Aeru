@@ -1,8 +1,5 @@
 /*
-See the LICENSE.txt file for this sample’s licensing information.
-
-Abstract:
-Conversion code for audio inputs.
+Apple's BufferConverter implementation for audio format conversion
 */
 
 import Foundation
@@ -16,6 +13,7 @@ class BufferConverter {
     }
     
     private var converter: AVAudioConverter?
+    
     func convertBuffer(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) throws -> AVAudioPCMBuffer {
         let inputFormat = buffer.format
         guard inputFormat != format else {
