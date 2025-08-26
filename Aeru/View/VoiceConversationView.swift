@@ -50,34 +50,34 @@ struct VoiceConversationView: View {
                                 VStack(spacing: 12) {
                                     // User message
                                     HStack {
-                                        HStack {
-                                            Image(systemName: "person.fill")
-                                                .foregroundColor(.blue)
-                                            Text(exchange.user)
-                                                .font(.body)
-                                        }
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.blue.opacity(0.1))
-                                        )
-                                        Spacer()
+                                        Spacer(minLength: 50)
+                                        
+                                        Text(exchange.user)
+                                            .textSelection(.enabled)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 20)
+                                                    .fill(Color.blue)
+                                            )
+                                            .foregroundColor(.white)
                                     }
                                     
                                     // AI response
                                     HStack {
-                                        Spacer()
-                                        HStack {
-                                            Image(systemName: "brain.head.profile")
-                                                .foregroundColor(.purple)
-                                            Markdown(exchange.ai)
-                                                .textSelection(.enabled)
-                                        }
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.purple.opacity(0.1))
-                                        )
+                                        Markdown(exchange.ai)
+                                            .textSelection(.enabled)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 20)
+                                                    .fill(Color(.systemGray5))
+                                            )
+                                            .foregroundColor(.primary)
+                                        
+                                        Spacer(minLength: 50)
                                     }
                                 }
                             }
@@ -87,19 +87,18 @@ struct VoiceConversationView: View {
                                 // Current user input
                                 if !userText.isEmpty || speechRecognitionManager.isRecording {
                                     HStack {
-                                        HStack {
-                                            Image(systemName: "person.fill")
-                                                .foregroundColor(.blue)
-                                            Text(userText.isEmpty ? "Listening..." : userText)
-                                                .font(.body)
-                                                .foregroundColor(userText.isEmpty ? .secondary : .primary)
-                                        }
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.blue.opacity(0.1))
-                                        )
-                                        Spacer()
+                                        Spacer(minLength: 50)
+                                        
+                                        Text(userText.isEmpty ? "Listening..." : userText)
+                                            .textSelection(.enabled)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 20)
+                                                    .fill(Color.blue)
+                                            )
+                                            .foregroundColor(.white)
                                     }
                                     .id("current")
                                 }
@@ -107,10 +106,7 @@ struct VoiceConversationView: View {
                                 // Current AI response
                                 if isWaitingForResponse || !aiResponse.isEmpty || textToSpeechManager.isSpeaking {
                                     HStack {
-                                        Spacer()
-                                        HStack {
-                                            Image(systemName: "brain.head.profile")
-                                                .foregroundColor(.purple)
+                                        VStack {
                                             if isWaitingForResponse && aiResponse.isEmpty {
                                                 HStack(spacing: 8) {
                                                     ProgressView()
@@ -124,11 +120,16 @@ struct VoiceConversationView: View {
                                                     .textSelection(.enabled)
                                             }
                                         }
-                                        .padding(12)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
                                         .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.purple.opacity(0.1))
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .fill(Color(.systemGray5))
                                         )
+                                        .foregroundColor(.primary)
+                                        
+                                        Spacer(minLength: 50)
                                     }
                                 }
                             }
