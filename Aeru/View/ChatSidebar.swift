@@ -74,7 +74,7 @@ struct ChatSidebar: View {
                     }
                     .font(.body)
                     .foregroundColor(.primary)
-                    .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
+                    .frame(height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -86,7 +86,7 @@ struct ChatSidebar: View {
                             showingBulkDeleteAlert = true 
                         }) {
                             Image(systemName: "trash")
-                                .font(.body)
+                                .font(.title3)
                                 .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
                         }
                         .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
@@ -99,7 +99,7 @@ struct ChatSidebar: View {
                             _ = sessionManager.getOrCreateNewChat()
                         }) {
                             Image(systemName: "plus.message")
-                                .font(.body)
+                                .font(.title3)
                                 .foregroundColor(.primary)
                         }
                         .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
