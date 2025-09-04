@@ -21,59 +21,7 @@ struct ChatSidebar: View {
     @State private var showingSettings = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Custom navigation header
-            HStack {
-                Button(isSelectionMode ? "Cancel" : "Select") {
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                    if isSelectionMode {
-                        isSelectionMode = false
-                        selectedSessions.removeAll()
-                    } else {
-                        isSelectionMode = true
-                    }
-                }
-                .font(.body)
-                .foregroundColor(.primary)
-                
-                Spacer()
-                
-                Text(isSelectionMode ? "\(selectedSessions.count) selected" : "Chats")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                if isSelectionMode {
-                    Button(action: { 
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                        impactFeedback.impactOccurred()
-                        showingBulkDeleteAlert = true 
-                    }) {
-                        Image(systemName: "trash")
-                            .font(.title3)
-                            .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
-                    }
-                    .disabled(selectedSessions.isEmpty)
-                } else {
-                    Button(action: { 
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
-                        _ = sessionManager.getOrCreateNewChat()
-                    }) {
-                        Image(systemName: "plus.message")
-                            .font(.title3)
-                            .foregroundColor(.primary)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(.systemBackground))
-            
-            Divider()
-            
+        NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(sessionManager.displayedSessions) { session in
@@ -110,35 +58,84 @@ struct ChatSidebar: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
             }
-            
-            Spacer()
-            
-            // Settings button at bottom
-            VStack {
-                Divider()
+            .navigationTitle(isSelectionMode ? "\(selectedSessions.count) selected" : "Chats")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(isSelectionMode ? "Cancel" : "Select") {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        if isSelectionMode {
+                            isSelectionMode = false
+                            selectedSessions.removeAll()
+                        } else {
+                            isSelectionMode = true
+                        }
+                    }
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isSelectionMode {
+                        // Delete button with glass effect
+                        Button(action: { 
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            showingBulkDeleteAlert = true 
+                        }) {
+                            Image(systemName: "trash")
+                                .font(.body)
+                                .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
+                        }
+                        .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
+                        .disabled(selectedSessions.isEmpty)
+                    } else {
+                        // New chat button with glass effect
+                        Button(action: { 
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            _ = sessionManager.getOrCreateNewChat()
+                        }) {
+                            Image(systemName: "plus.message")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            // Settings button at bottom with glass effect
+            HStack {
                 Button(action: { 
                     let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                     impactFeedback.impactOccurred()
                     showingSettings = true 
                 }) {
-                    HStack {
+                    HStack(spacing: 12) {
                         Image(systemName: "gear")
-                            .font(.title3)
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.primary)
                         
                         Text("Settings")
                             .font(.body)
+                            .fontWeight(.medium)
                             .foregroundColor(.primary)
                         
                         Spacer()
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                    .glassEffect(.regular.interactive())
                 }
-                .background(Color(.systemBackground))
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
         }
-        .background(Color(.systemBackground))
         .alert("Edit Chat Title", isPresented: Binding<Bool>(
             get: { editingSession != nil },
             set: { _ in editingSession = nil }
