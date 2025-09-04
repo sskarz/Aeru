@@ -101,7 +101,7 @@ struct AeruView: View {
                     .lineLimit(1...3)
                     .textInputAutocapitalization(.sentences)
                     .disableAutocorrection(false)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
+                    .glassEffect(.regular.interactive())
                 
                 // Send/Voice button
                 Button(action: {
