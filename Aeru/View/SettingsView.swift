@@ -30,7 +30,7 @@ struct SettingsView: View {
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 VStack(spacing: 16) {
                     // App Info Section

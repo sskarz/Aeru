@@ -48,7 +48,14 @@ struct AeruView: View {
     @GestureState private var gestureOffset: CGFloat = 0
     
     private var sidebarWidth: CGFloat {
-        UIScreen.main.bounds.width * 0.8
+        let screenWidth = UIScreen.main.bounds.width
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            // iPad: Use fixed width that scales better
+            return min(320, screenWidth * 0.35)
+        } else {
+            // iPhone: Use 80% of screen width
+            return screenWidth * 0.8
+        }
     }
 
     private var isModelResponding: Bool {
@@ -71,7 +78,7 @@ struct AeruView: View {
     }
     
     private var inputBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: UIDevice.current.userInterfaceIdiom == .pad ? 16 : 12) {
             // Document upload button
             Button(action: { 
                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -81,7 +88,7 @@ struct AeruView: View {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.primary)
-                    .frame(width: 36, height: 36)
+                    .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
                     .glassEffect(.regular.interactive())
             }
             
@@ -111,7 +118,7 @@ struct AeruView: View {
                     Image(systemName: messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "waveform" : "arrow.up")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.secondary)
-                        .frame(width: 32, height: 32)
+                        .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32, height: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32)
                         .glassEffect(.regular.interactive())
                         .background(
                             Circle()
@@ -121,7 +128,7 @@ struct AeruView: View {
                 .disabled(isModelResponding)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 24 : 16)
     }
     
     
@@ -129,7 +136,7 @@ struct AeruView: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Main chat area (gets pushed by sidebar)
-                NavigationView {
+                NavigationStack {
                     VStack(spacing: 0) {
                         // Chat content
                         if let currentSession = sessionManager.currentSession {
@@ -367,8 +374,8 @@ struct AeruView: View {
                     Spacer()
                         .frame(height: 8)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 32 : 20)
+                .padding(.vertical, UIDevice.current.userInterfaceIdiom == .pad ? 24 : 16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollDismissesKeyboard(.immediately)
@@ -426,7 +433,7 @@ struct AeruView: View {
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 60 : 40)
             }
             
             Spacer()
@@ -530,7 +537,7 @@ struct ChatBubbleView: View {
     var body: some View {
         HStack {
             if message.isUser {
-                Spacer(minLength: 50)
+                Spacer(minLength: UIDevice.current.userInterfaceIdiom == .pad ? 80 : 50)
             }
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
@@ -619,7 +626,7 @@ struct ChatBubbleView: View {
             }
             
             if !message.isUser {
-                Spacer(minLength: 50)
+                Spacer(minLength: UIDevice.current.userInterfaceIdiom == .pad ? 80 : 50)
             }
         }
     }
@@ -679,7 +686,7 @@ struct TypingIndicatorView: View {
                     .fill(Color(.systemGray5))
             )
             
-            Spacer(minLength: 50)
+            Spacer(minLength: UIDevice.current.userInterfaceIdiom == .pad ? 80 : 50)
         }
         .onAppear {
             animating = true
@@ -694,7 +701,7 @@ struct SourcesView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     if isLoading && sources.isEmpty {
@@ -795,7 +802,7 @@ struct KnowledgeBaseView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 16) {
                 
                 Button(action: { 
@@ -918,7 +925,7 @@ struct WebBrowserView: View {
     @State private var webView: WKWebView?
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // URL Bar
                 HStack(spacing: 8) {

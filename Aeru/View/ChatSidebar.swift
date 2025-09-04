@@ -21,7 +21,59 @@ struct ChatSidebar: View {
     @State private var showingSettings = false
     
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // Custom navigation header
+            HStack {
+                Button(isSelectionMode ? "Cancel" : "Select") {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
+                    if isSelectionMode {
+                        isSelectionMode = false
+                        selectedSessions.removeAll()
+                    } else {
+                        isSelectionMode = true
+                    }
+                }
+                .font(.body)
+                .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text(isSelectionMode ? "\(selectedSessions.count) selected" : "Chats")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                if isSelectionMode {
+                    Button(action: { 
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        showingBulkDeleteAlert = true 
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.title3)
+                            .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
+                    }
+                    .disabled(selectedSessions.isEmpty)
+                } else {
+                    Button(action: { 
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        _ = sessionManager.getOrCreateNewChat()
+                    }) {
+                        Image(systemName: "plus.message")
+                            .font(.title3)
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.systemBackground))
+            
+            Divider()
+            
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(sessionManager.displayedSessions) { session in
@@ -58,66 +110,32 @@ struct ChatSidebar: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
             }
-            .navigationTitle(isSelectionMode ? "\(selectedSessions.count) selected" : "Chats")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(isSelectionMode ? "Cancel" : "Select") {
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
-                        if isSelectionMode {
-                            isSelectionMode = false
-                            selectedSessions.removeAll()
-                        } else {
-                            isSelectionMode = true
-                        }
+            
+            Spacer()
+            
+            // Settings button at bottom
+            VStack {
+                Divider()
+                Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
+                    showingSettings = true 
+                }) {
+                    HStack {
+                        Image(systemName: "gear")
+                            .font(.title3)
+                            .foregroundColor(.primary)
+                        
+                        Text("Settings")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
                     }
-                    .font(.body)
-                    .foregroundColor(.primary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if isSelectionMode {
-                        Button(action: { 
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                            impactFeedback.impactOccurred()
-                            showingBulkDeleteAlert = true 
-                        }) {
-                            Image(systemName: "trash")
-                                .font(.title3)
-                                .foregroundColor(selectedSessions.isEmpty ? .gray : .red)
-                        }
-                        .disabled(selectedSessions.isEmpty)
-                    } else {
-                        Button(action: { 
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                            impactFeedback.impactOccurred()
-                            _ = sessionManager.getOrCreateNewChat()
-                        }) {
-                            Image(systemName: "plus.message")
-                                .font(.title3)
-                                .foregroundColor(.primary)
-                        }
-                    }
-                }
-                
-                ToolbarItem(placement: .bottomBar) {
-                    Button(action: { 
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
-                        showingSettings = true 
-                    }) {
-                        HStack {
-                            Image(systemName: "gear")
-                                .font(.title3)
-                                .foregroundColor(.primary)
-                            
-                            Text("Settings")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                        }
-                    }
-                }
+                .background(Color(.systemBackground))
             }
         }
         .background(Color(.systemBackground))

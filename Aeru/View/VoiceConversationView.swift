@@ -18,7 +18,7 @@ struct VoiceConversationView: View {
     @State private var conversationHistory: [(user: String, ai: String)] = []
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 // Conversation Content
                 ScrollViewReader { proxy in
@@ -113,7 +113,7 @@ struct VoiceConversationView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 32 : 20)
                     }
                     .onChange(of: conversationHistory.count) { _, _ in
                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -180,7 +180,7 @@ struct VoiceConversationView: View {
                                     .fill(Color.green)
                             )
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 32 : 20)
                     } else {
                         Button(action: exitLiveMode) {
                             HStack(spacing: 12) {
@@ -199,7 +199,7 @@ struct VoiceConversationView: View {
                                     .fill(Color.red)
                             )
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 32 : 20)
                     }
                 }
                 .padding(.bottom, 20)
