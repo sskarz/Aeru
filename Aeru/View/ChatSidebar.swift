@@ -125,7 +125,6 @@ struct ChatSidebar: View {
                             .fontWeight(.medium)
                             .foregroundColor(.primary)
                         
-                        Spacer()
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
