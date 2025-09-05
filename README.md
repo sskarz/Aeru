@@ -12,7 +12,7 @@
 
 Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to deliver intelligent responses by searching both local knowledge bases and real-time web content. Built with SwiftUI and optimized for iOS, it provides a seamless chat interface for enhanced AI interactions.
 
-### 👨🏽‍💻 [Demo Video](https://youtube.com/shorts/BJqX9k7rXzo?feature=share)
+### 👨🏽‍💻 [Demo Video](https://youtube.com/shorts/IuYqGmmnz94)
 
 ### 📱 [TestFlight Download](https://testflight.apple.com/join/6gaB7S1R)
 - Must use an [Apple Intelligence activated device](https://9to5mac.com/every-device-that-supports-apple-intelligence/)
