@@ -163,8 +163,8 @@ struct OnboardingView: View {
     private var chatModesPage: some View {
         VStack(spacing: 32) {
             VStack(spacing: 16) {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 40))
+                Image(systemName: "message.circle.fill")
+                    .font(.system(size: 60))
                     .foregroundColor(.blue)
                     .glassEffect(.regular)
                 
@@ -259,8 +259,8 @@ struct OnboardingView: View {
     private var documentUploadPage: some View {
         VStack(spacing: 32) {
             VStack(spacing: 16) {
-                Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 40))
+                Image(systemName: "doc.circle.fill")
+                    .font(.system(size: 60))
                     .foregroundColor(.green)
                     .glassEffect(.regular)
                 
