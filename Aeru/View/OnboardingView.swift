@@ -37,16 +37,7 @@ struct OnboardingView: View {
             Spacer()
             
             // App Icon
-            Image(systemName: "message.circle.fill")
-                .font(.system(size: 100))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .glassEffect(.regular)
+            DynamicLogoView(size: 100, cornerRadius: 22, showGradientBorder: true)
             
             VStack(spacing: 16) {
                 Text("Welcome to Aeru")
@@ -173,7 +164,7 @@ struct OnboardingView: View {
         VStack(spacing: 32) {
             VStack(spacing: 16) {
                 Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 60))
+                    .font(.system(size: 40))
                     .foregroundColor(.blue)
                     .glassEffect(.regular)
                 
@@ -269,7 +260,7 @@ struct OnboardingView: View {
         VStack(spacing: 32) {
             VStack(spacing: 16) {
                 Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 60))
+                    .font(.system(size: 40))
                     .foregroundColor(.green)
                     .glassEffect(.regular)
                 

@@ -35,7 +35,10 @@ struct SettingsView: View {
             VStack(spacing: 24) {
                 VStack(spacing: 16) {
                     // App Info Section
-                    VStack(spacing: 8) {
+                    VStack(spacing: 12) {
+                        // App Logo
+                        DynamicLogoView(size: 80, cornerRadius: 18, showGradientBorder: false)
+                        
                         Text("Aeru")
                             .font(.title)
                             .fontWeight(.bold)
