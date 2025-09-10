@@ -28,6 +28,7 @@ enum AppColorScheme: String, CaseIterable {
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
+    @State private var showOnboarding = false
     
     var body: some View {
         NavigationStack {
@@ -71,6 +72,41 @@ struct SettingsView: View {
                         .padding(.vertical, 12)
                         .background(Color(.systemGray6))
                         .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal, 20)
+                
+                // Tutorial Section
+                VStack(spacing: 16) {
+                    Text("Help & Tutorial")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            showOnboarding = true
+                        }) {
+                            HStack {
+                                Image(systemName: "questionmark.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                                
+                                Text("View Tutorial")
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "arrow.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -154,6 +190,9 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView()
         }
     }
 }
