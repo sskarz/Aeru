@@ -16,7 +16,7 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ### 📱 [TestFlight Download](https://testflight.apple.com/join/6gaB7S1R)
 - Must use an [Apple Intelligence activated device](https://9to5mac.com/every-device-that-supports-apple-intelligence/)
-- Latest version of iOS 26 Beta (Dev Beta 5, Public Beta 2)
+- Latest version of iOS 26 Beta (Dev Beta 5, Public Beta 2) with Liquid Glass support
 
 ### 💬 [Discord Community](https://discord.gg/RbWjUukHVV)
 
@@ -36,10 +36,11 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ### 💻 **Native iOS Experience**
 
-- **SwiftUI Interface**: Modern, responsive design optimized for iOS
+- **SwiftUI Interface**: Modern, responsive design optimized for iOS with Liquid Glass effects
 - **Chat Sidebar**: Organized conversation management
 - **Keyboard Shortcuts**: Efficient navigation and interaction
 - **Document Processing**: Support for various file formats in the knowledge base
+- **Voice Mode**: Hands-free interaction with AI using natural speech
 
 ### 🔧 **Technical Excellence**
 
@@ -88,12 +89,19 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ### Basic Chat Interface
 
-1. **Start a Conversation**: Type your question in the input field
+1. **Start a Conversation**: Type your question in the input field or use voice mode
 2. **Choose Search Mode**:
    - Use RAG for queries about your local knowledge base
    - Use web search for current events and real-time information
 3. **View Responses**: Watch as responses stream in real-time
 4. **Manage Conversations**: Use the sidebar to organize multiple chat sessions
+
+### Voice Mode
+
+- **Hands-free Operation**: Activate voice mode for natural speech interaction
+- **Real-time Processing**: Speech-to-text conversion with immediate AI response
+- **Accessibility**: Enhanced accessibility for users who prefer voice interaction
+- **Liquid Glass Interface**: Beautiful visual feedback with iOS 26's Liquid Glass effects
 
 ### RAG (Local Knowledge Base)
 
@@ -172,7 +180,6 @@ We welcome contributions! Here's how you can help:
 ### Wishlist Updates
 
 - 🤖 **MCP Server Support**: Create curated list of MCP Servers to connect and use on-device
-- 🎤 **Voice Mode**: Enable voice mode to interact with the AI hands free
 
 ## 📄 License
 
