@@ -43,7 +43,7 @@ struct SettingsView: View {
                             .font(.title)
                             .fontWeight(.bold)
                         
-                        Text("AI Chat Assistant")
+                        Text("Private On-Device Offline AI")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -90,7 +90,7 @@ struct SettingsView: View {
                             showOnboarding = true
                         }) {
                             HStack {
-                                Image(systemName: "questionmark.circle.fill")
+                                Image(systemName: "graduationcap.fill")
                                     .font(.title3)
                                     .foregroundColor(.blue)
                                 

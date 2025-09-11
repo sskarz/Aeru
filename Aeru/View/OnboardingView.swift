@@ -189,7 +189,7 @@ struct OnboardingView: View {
                 
                 FeatureRow(
                     icon: "doc.text.fill",
-                    title: "RAG Mode",
+                    title: "RAG",
                     description: "Chat with your uploaded documents using semantic search",
                     color: .green
                 )
