@@ -40,10 +40,23 @@ struct OnboardingView: View {
             DynamicLogoView(size: 100, cornerRadius: 22, showGradientBorder: true)
             
             VStack(spacing: 16) {
-                Text("Welcome to Aeru")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .multilineTextAlignment(.center)
+                HStack(spacing: 0) {
+                    Text("Welcome to ")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    
+                    Text("Aeru")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                .multilineTextAlignment(.center)
                 
                 Text("Your intelligent AI assistant with voice interaction, document processing, and web search capabilities")
                     .font(.body)
