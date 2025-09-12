@@ -40,7 +40,7 @@ struct VoiceConversationView: View {
                                                 RoundedRectangle(cornerRadius: 20)
                                                     .fill(Color.blue)
                                             )
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.secondary)
                                     }
                                     
                                     // AI response
@@ -77,7 +77,7 @@ struct VoiceConversationView: View {
                                                 RoundedRectangle(cornerRadius: 20)
                                                     .fill(Color.blue)
                                             )
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.secondary)
                                     }
                                     .id("current")
                                 }
