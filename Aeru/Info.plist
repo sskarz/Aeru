@@ -12,7 +12,6 @@
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>iphone-performance-gaming-tier</string>
-		<string>ipad-minimum-performance-m1</string>
 	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
