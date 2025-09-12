@@ -28,6 +28,7 @@ struct AeruView: View {
     @StateObject private var speechRecognitionManager = SpeechRecognitionManager()
     @StateObject private var textToSpeechManager = TextToSpeechManager()
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var messageText: String = ""
     // useWebSearch is now per-session, computed from currentSession
@@ -309,6 +310,7 @@ struct AeruView: View {
     }
     
     
+    
     private func chatContentView(for session: ChatSession) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -337,7 +339,7 @@ struct AeruView: View {
                                     sourcesLoading = false
                                 }
                             }
-                        }, textToSpeechManager: textToSpeechManager)
+                        }, textToSpeechManager: textToSpeechManager, selectedColorScheme: selectedColorScheme, colorScheme: colorScheme)
                         .id(message.id)
                     }
                     
@@ -360,7 +362,7 @@ struct AeruView: View {
                                     sourcesLoading = false
                                 }
                             }
-                        }, textToSpeechManager: textToSpeechManager)
+                        }, textToSpeechManager: textToSpeechManager, selectedColorScheme: selectedColorScheme, colorScheme: colorScheme)
                         .id("streaming")
                     }
                     
@@ -526,12 +528,16 @@ struct ChatBubbleView: View {
     let onLinkTap: ((String) -> Void)?
     let onSourcesTap: (([WebSearchResult]) -> Void)?
     let textToSpeechManager: TextToSpeechManager?
+    let selectedColorScheme: String
+    let colorScheme: ColorScheme
     
-    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil, textToSpeechManager: TextToSpeechManager? = nil) {
+    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil, textToSpeechManager: TextToSpeechManager? = nil, selectedColorScheme: String, colorScheme: ColorScheme) {
         self.message = message
         self.onLinkTap = onLinkTap
         self.onSourcesTap = onSourcesTap
         self.textToSpeechManager = textToSpeechManager
+        self.selectedColorScheme = selectedColorScheme
+        self.colorScheme = colorScheme
     }
     
     var body: some View {
@@ -551,7 +557,7 @@ struct ChatBubbleView: View {
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.blue)
                         )
-                        .foregroundColor(.secondary)
+                        .foregroundColor(getUserTextColor())
                 } else {
                     Markdown(message.text)
                         .textSelection(.enabled)
@@ -657,6 +663,16 @@ struct ChatBubbleView: View {
     
     private func copyToClipboard(_ text: String) {
         UIPasteboard.general.string = text
+    }
+    
+    private func getUserTextColor() -> Color {
+        if selectedColorScheme == AppColorScheme.dark.rawValue {
+            return .white
+        } else if selectedColorScheme == AppColorScheme.system.rawValue {
+            return colorScheme == .dark ? .white : .secondary
+        } else {
+            return .secondary
+        }
     }
 }
 

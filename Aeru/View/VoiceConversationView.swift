@@ -10,6 +10,7 @@ struct VoiceConversationView: View {
     let currentSession: ChatSession
     let sessionManager: ChatSessionManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var userText: String = ""
     @State private var aiResponse: String = ""
@@ -40,7 +41,7 @@ struct VoiceConversationView: View {
                                                 RoundedRectangle(cornerRadius: 20)
                                                     .fill(Color.blue)
                                             )
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(colorScheme == .dark ? .white : .secondary)
                                     }
                                     
                                     // AI response
@@ -77,7 +78,7 @@ struct VoiceConversationView: View {
                                                 RoundedRectangle(cornerRadius: 20)
                                                     .fill(Color.blue)
                                             )
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(colorScheme == .dark ? .white : .secondary)
                                     }
                                     .id("current")
                                 }
