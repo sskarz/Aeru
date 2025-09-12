@@ -182,6 +182,72 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 20)
                 
+                // Legal Section
+                VStack(spacing: 16) {
+                    Text("Legal")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    VStack(spacing: 12) {
+                        // Privacy Policy Link
+                        Button(action: {
+                            if let url = URL(string: "https://aeru-ai.app/privacy") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "lock.shield.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                                
+                                Text("Privacy Policy")
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Terms of Service Link
+                        Button(action: {
+                            if let url = URL(string: "https://aeru-ai.app/terms") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "doc.text.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.green)
+                                
+                                Text("Terms of Service")
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+                
                 Spacer()
             }
             .navigationTitle("Settings")
