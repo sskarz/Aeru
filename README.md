@@ -14,9 +14,9 @@ Aeru is a powerful iOS app that leverages Apple's FoundationModels framework to 
 
 ### 👨🏽‍💻 [Demo Video](https://youtube.com/shorts/IuYqGmmnz94)
 
-### 📱 [TestFlight Download](https://testflight.apple.com/join/6gaB7S1R)
+### 📱 [App Store Download](https://apps.apple.com/us/app/aeru-offline-private-ai/id6749188495)
 - Must use an [Apple Intelligence activated device](https://9to5mac.com/every-device-that-supports-apple-intelligence/)
-- Latest version of iOS 26 Beta (Dev Beta 5, Public Beta 2) with Liquid Glass support
+- Latest version of iOS 26
 
 ### 💬 [Discord Community](https://discord.gg/RbWjUukHVV)
 
