@@ -33,29 +33,20 @@ struct AeruView: View {
     // useWebSearch is now per-session, computed from currentSession
     @State private var showKnowledgeBase: Bool = false
     @State private var newEntry: String = ""
-    @State private var showSidebar: Bool = false
     @State private var webBrowserURL: BrowserURL? = nil
     @State private var showConnectivityAlert: Bool = false
     @State private var showSources: Bool = false
     @State private var sourcesToShow: [WebSearchResult] = []
     @State private var sourcesLoading: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
-    
-    
-    // Sidebar animation properties
-    @State private var offset: CGFloat = 0
-    @GestureState private var gestureOffset: CGFloat = 0
-    
-    private var sidebarWidth: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            // iPad: Use fixed width that scales better
-            return min(320, screenWidth * 0.35)
-        } else {
-            // iPhone: Use 80% of screen width
-            return screenWidth * 0.8
-        }
-    }
+
+    // Native split-view navigation state (replaces the hand-rolled drawer).
+    @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+    @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
+
+    /// Cached once per view value instead of re-querying `UIDevice` at every
+    /// use site throughout the body.
+    private let isPad = UIDevice.current.userInterfaceIdiom == UIUserInterfaceIdiom.pad
 
     private var isModelResponding: Bool {
         llm.isResponding || llm.isWebSearching
@@ -75,7 +66,16 @@ struct AeruView: View {
         textToSpeechManager.stopSpeaking()
         _ = sessionManager.getOrCreateNewChat()
     }
-    
+
+    /// Returns focus to the chat after picking or creating a session, so the
+    /// split view collapses back to the detail column on compact widths.
+    private func showDetailColumn() {
+        isMessageFieldFocused = false
+        withAnimation(.snappy) {
+            preferredCompactColumn = .detail
+        }
+    }
+
     @ViewBuilder
     private var modelStatusBanner: some View {
         switch modelManager.status {
@@ -111,8 +111,8 @@ struct AeruView: View {
     }
 
     private var inputBar: some View {
-        GlassEffectContainer(spacing: UIDevice.current.userInterfaceIdiom == .pad ? 16 : 12) {
-            HStack(spacing: UIDevice.current.userInterfaceIdiom == .pad ? 16 : 12) {
+        GlassEffectContainer(spacing: isPad ? 16 : 12) {
+            HStack(spacing: isPad ? 16 : 12) {
                 // Document upload button
                 Button(action: {
                     let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -122,7 +122,7 @@ struct AeruView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.primary)
-                        .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
+                        .frame(width: isPad ? 44 : 36, height: isPad ? 44 : 36)
                         .glassEffect(.regular.interactive())
                 }
 
@@ -146,7 +146,7 @@ struct AeruView: View {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white)
-                            .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32, height: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32)
+                            .frame(width: isPad ? 40 : 32, height: isPad ? 40 : 32)
                             .background(
                                 Circle()
                                     .fill(isModelResponding || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray.opacity(0.6) : Color.blue)
@@ -157,103 +157,56 @@ struct AeruView: View {
                 }
             }
         }
-        .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 24 : 16)
+        .padding(.horizontal, isPad ? 24 : 16)
     }
     
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Main chat area (gets pushed by sidebar)
-                NavigationStack {
-                    VStack(spacing: 0) {
-                        modelStatusBanner
+        NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $preferredCompactColumn) {
+            ChatSidebar(sessionManager: sessionManager, onSelectSession: showDetailColumn)
+                .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 360)
+        } detail: {
+            NavigationStack {
+                VStack(spacing: 0) {
+                    modelStatusBanner
 
-                        // Chat content
-                        if let currentSession = sessionManager.currentSession {
-                            chatContentView(for: currentSession)
-                        } else {
-                            emptyStateView
-                        }
+                    // Chat content
+                    if let currentSession = sessionManager.currentSession {
+                        chatContentView(for: currentSession)
+                    } else {
+                        emptyStateView
                     }
-                    .animation(.easeInOut(duration: 0.3), value: modelManager.status)
-                    .navigationTitle(sessionManager.currentSession?.displayTitle ?? "Aeru")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button(action: { 
+                }
+                .animation(.easeInOut(duration: 0.3), value: modelManager.status)
+                .navigationTitle(sessionManager.currentSession?.displayTitle ?? "Aeru")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    // Navigation to the chat list is supplied natively by
+                    // NavigationSplitView: a back control on compact widths and a
+                    // sidebar toggle on regular widths.
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        if !shouldHideNewChatButton {
+                            Button(action: {
                                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                                 impactFeedback.impactOccurred()
-                                isMessageFieldFocused = false
-                                showSidebar.toggle()
+                                handleNewChatCreation()
                             }) {
-                                Image(systemName: "line.3.horizontal")
+                                Image(systemName: "plus.message")
                                     .font(.title3)
                                     .foregroundColor(.primary)
                             }
                         }
-                        
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            if !shouldHideNewChatButton {
-                                Button(action: {
-                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                                    impactFeedback.impactOccurred()
-                                    handleNewChatCreation()
-                                }) {
-                                    Image(systemName: "plus.message")
-                                        .font(.title3)
-                                        .foregroundColor(.primary)
-                                }
-                            }
-                        }
-                        
-                    }
-                    .safeAreaInset(edge: .bottom) {
-                        if sessionManager.currentSession != nil {
-                            inputBar
-                                .padding(.bottom, 8)
-                        }
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemBackground))
-                .offset(x: max(offset + gestureOffset, 0))
-                .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
-                
-                // Sidebar
-                ChatSidebar(sessionManager: sessionManager)
-                    .frame(width: sidebarWidth)
-                    .offset(x: -sidebarWidth)
-                    .offset(x: max(offset + gestureOffset, 0))
-                    .animation(.interactiveSpring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: gestureOffset)
-            }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 20, coordinateSpace: .local)
-                    .updating($gestureOffset) { value, out, _ in
-                        let translation = value.translation.width
-                        let translationHeight = value.translation.height
-                        
-                        // Only activate for predominantly horizontal gestures
-                        guard abs(translation) > abs(translationHeight) * 1.5 else { return }
-                        
-                        if showSidebar {
-                            // When sidebar is open, allow closing gesture (drag right to left)
-                            // Clamp to prevent over-swiping beyond the open position
-                            out = max(min(translation, 0), -sidebarWidth)
-                        } else {
-                            // When sidebar is closed, allow opening gesture (drag left to right)
-                            // Apply the translation directly but clamp it to sidebarWidth
-                            out = max(0, min(translation, sidebarWidth))
-                        }
+                .safeAreaInset(edge: .bottom) {
+                    if sessionManager.currentSession != nil {
+                        inputBar
+                            .padding(.bottom, 8)
                     }
-                    .onEnded(onDragEnd)
-            )
-            .onChange(of: showSidebar) { _, newValue in
-                withAnimation {
-                    offset = newValue ? sidebarWidth : 0
                 }
             }
         }
+        .navigationSplitViewStyle(.balanced)
         .onAppear {
             modelManager.start()
             // Defer heavy initialization to avoid blocking UI
@@ -364,7 +317,7 @@ struct AeruView: View {
                                     sourcesLoading = false
                                 }
                             }
-                        }, textToSpeechManager: textToSpeechManager, selectedColorScheme: selectedColorScheme, colorScheme: colorScheme)
+                        }, textToSpeechManager: textToSpeechManager, selectedColorScheme: selectedColorScheme, colorScheme: colorScheme, isStreaming: true)
                         .id("streaming")
                     }
                     
@@ -378,30 +331,22 @@ struct AeruView: View {
                     Spacer()
                         .frame(height: 8)
                 }
-                .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 32 : 20)
-                .padding(.vertical, UIDevice.current.userInterfaceIdiom == .pad ? 24 : 16)
+                .padding(.horizontal, isPad ? 32 : 20)
+                .padding(.vertical, isPad ? 24 : 16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollDismissesKeyboard(.immediately)
-            
-            .onChange(of: llm.chatMessages.count) { oldValue, newValue in
+            // Keeps the latest content pinned to the bottom as it grows. This
+            // makes streaming follow smoothly without firing an animated
+            // `scrollTo` on every token, which previously stacked overlapping
+            // 0.3s animations and caused stutter.
+            .defaultScrollAnchor(.bottom)
+            // Discrete events still get a gentle explicit scroll: a brand-new
+            // message and the keyboard appearing.
+            .onChange(of: llm.chatMessages.count) { _, _ in
                 if let lastMessage = llm.chatMessages.last {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
-                }
-            }
-            .onReceive(llm.$userLLMResponse) { newValue in
-                if newValue != nil {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        proxy.scrollTo("streaming", anchor: .bottom)
-                    }
-                }
-            }
-            .onChange(of: llm.isWebSearching) { oldValue, newValue in
-                if newValue && !llm.isResponding {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        proxy.scrollTo("typing", anchor: .bottom)
                     }
                 }
             }
@@ -437,7 +382,7 @@ struct AeruView: View {
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 60 : 40)
+                    .padding(.horizontal, isPad ? 60 : 40)
             }
             
             Spacer()
@@ -472,35 +417,6 @@ struct AeruView: View {
         }
     }
     
-    private func onDragEnd(value: DragGesture.Value) {
-        let translation = value.translation.width
-        let translationHeight = value.translation.height
-        let velocity = value.velocity.width
-        
-        // Only process predominantly horizontal gestures
-        guard abs(translation) > abs(translationHeight) * 1.5 else { return }
-        
-        // Use a lower threshold for iOS 26 compatibility
-        let threshold = sidebarWidth * 0.3
-        
-        let willToggleSidebar: Bool
-        if showSidebar {
-            // Sidebar is open - check if should close
-            willToggleSidebar = translation < -threshold || velocity < -500
-            showSidebar = !willToggleSidebar
-        } else {
-            // Sidebar is closed - check if should open
-            willToggleSidebar = translation > threshold || velocity > 500
-            showSidebar = willToggleSidebar
-        }
-        
-        // Add haptic feedback for successful swipe gestures
-        if willToggleSidebar {
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
-        }
-    }
-    
 }
 
 struct ChatBubbleView: View {
@@ -510,20 +426,25 @@ struct ChatBubbleView: View {
     let textToSpeechManager: TextToSpeechManager?
     let selectedColorScheme: String
     let colorScheme: ColorScheme
-    
-    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil, textToSpeechManager: TextToSpeechManager? = nil, selectedColorScheme: String, colorScheme: ColorScheme) {
+    /// While a response is still streaming we render plain `Text` instead of
+    /// `Markdown` to avoid re-parsing the whole (throttled) snapshot each update.
+    let isStreaming: Bool
+    private let isPad = UIDevice.current.userInterfaceIdiom == UIUserInterfaceIdiom.pad
+
+    init(message: ChatMessage, onLinkTap: ((String) -> Void)? = nil, onSourcesTap: (([WebSearchResult]) -> Void)? = nil, textToSpeechManager: TextToSpeechManager? = nil, selectedColorScheme: String, colorScheme: ColorScheme, isStreaming: Bool = false) {
         self.message = message
         self.onLinkTap = onLinkTap
         self.onSourcesTap = onSourcesTap
         self.textToSpeechManager = textToSpeechManager
         self.selectedColorScheme = selectedColorScheme
         self.colorScheme = colorScheme
+        self.isStreaming = isStreaming
     }
     
     var body: some View {
         HStack {
             if message.isUser {
-                Spacer(minLength: UIDevice.current.userInterfaceIdiom == .pad ? 80 : 50)
+                Spacer(minLength: isPad ? 80 : 50)
             }
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
@@ -538,15 +459,23 @@ struct ChatBubbleView: View {
                         )
                         .foregroundColor(.white)
                 } else {
-                    Markdown(message.text)
-                        .textSelection(.enabled)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color(.systemGray5))
-                        )
-                        .foregroundColor(.primary)
+                    Group {
+                        if isStreaming {
+                            // Plain text during streaming; Markdown re-parsing the
+                            // growing snapshot on every update is too expensive.
+                            Text(message.text)
+                        } else {
+                            Markdown(message.text)
+                        }
+                    }
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(.systemGray5))
+                    )
+                    .foregroundColor(.primary)
                 }
                 
                 // Action buttons for AI responses
@@ -608,7 +537,7 @@ struct ChatBubbleView: View {
             }
             
             if !message.isUser {
-                Spacer(minLength: UIDevice.current.userInterfaceIdiom == .pad ? 80 : 50)
+                Spacer(minLength: isPad ? 80 : 50)
             }
         }
     }
@@ -648,6 +577,7 @@ struct ChatBubbleView: View {
 
 struct TypingIndicatorView: View {
     @State private var animating = false
+    private let isPad = UIDevice.current.userInterfaceIdiom == UIUserInterfaceIdiom.pad
     
     var body: some View {
         HStack {
@@ -672,7 +602,7 @@ struct TypingIndicatorView: View {
                     .fill(Color(.systemGray5))
             )
             
-            Spacer(minLength: UIDevice.current.userInterfaceIdiom == .pad ? 80 : 50)
+            Spacer(minLength: isPad ? 80 : 50)
         }
         .onAppear {
             animating = true

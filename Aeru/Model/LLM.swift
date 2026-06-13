@@ -202,9 +202,25 @@ class LLM: ObservableObject {
         let responseStream = session.streamResponse(to: prompt)
         updateIsResponding()
         var fullResponse = ""
+        // Coalesce snapshot publishes to ~12 fps. The raw stream emits a snapshot
+        // per token; forwarding each one re-renders the whole transcript and was
+        // the main source of stutter while a response generates.
+        let minInterval: TimeInterval = 0.08
+        var lastPublish = Date.distantPast
+        var latestPartial: LanguageModelSession.ResponseStream<String>.Snapshot?
         for try await partial in responseStream {
-            userLLMResponse = partial
             fullResponse = partial.content
+            latestPartial = partial
+            let now = Date()
+            if now.timeIntervalSince(lastPublish) >= minInterval {
+                userLLMResponse = partial
+                lastPublish = now
+            }
+        }
+        // Flush the final snapshot so the streaming bubble shows the complete
+        // text for the brief moment before it is committed to the transcript.
+        if let latestPartial {
+            userLLMResponse = latestPartial
         }
         return fullResponse
     }
@@ -374,6 +390,7 @@ class LLM: ObservableObject {
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        sessionManager.markSessionHasMessages(sessionId)
 
         let results = await webSearch.searchAndScrape(query: userLLMQuery)
         webSearchResults = results
@@ -423,6 +440,7 @@ class LLM: ObservableObject {
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        sessionManager.markSessionHasMessages(sessionId)
 
         let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
         await rag.loadCollection()
@@ -459,6 +477,7 @@ class LLM: ObservableObject {
         let userMessage = ChatMessage(text: UIQuery, isUser: true)
         chatMessages.append(userMessage)
         databaseManager.saveMessage(userMessage, sessionId: sessionId)
+        sessionManager.markSessionHasMessages(sessionId)
 
         await executeQuery(prompt: userLLMQuery, sessionId: sessionId, for: chatSession,
                            sessionManager: sessionManager, isFirstMessage: isFirstMessage)

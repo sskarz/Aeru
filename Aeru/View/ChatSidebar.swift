@@ -11,6 +11,9 @@ import Foundation
 
 struct ChatSidebar: View {
     @ObservedObject var sessionManager: ChatSessionManager
+    /// Called after the user picks or creates a session, so the host can
+    /// collapse the split view back to the chat on compact widths.
+    var onSelectSession: (() -> Void)? = nil
     @State private var editingSession: ChatSession?
     @State private var editTitle = ""
     @State private var showingDuplicateTitleAlert = false
@@ -21,8 +24,7 @@ struct ChatSidebar: View {
     @State private var showingSettings = false
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(sessionManager.displayedSessions) { session in
                         ChatSessionRow(
@@ -43,6 +45,7 @@ struct ChatSidebar: View {
                                     let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                                     impactFeedback.impactOccurred()
                                     sessionManager.selectSession(session)
+                                    onSelectSession?()
                                 }
                             },
                             onEdit: {
@@ -93,10 +96,11 @@ struct ChatSidebar: View {
                         .disabled(selectedSessions.isEmpty)
                     } else {
                         // New chat button with glass effect
-                        Button(action: { 
+                        Button(action: {
                             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                             impactFeedback.impactOccurred()
                             _ = sessionManager.getOrCreateNewChat()
+                            onSelectSession?()
                         }) {
                             Image(systemName: "plus.message")
                                 .font(.title3)
@@ -106,7 +110,6 @@ struct ChatSidebar: View {
                     }
                 }
             }
-        }
         .safeAreaInset(edge: .bottom) {
             // Settings button at bottom with glass effect
             HStack {

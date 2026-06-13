@@ -21,11 +21,17 @@ struct ChatSession: Identifiable, Codable, Equatable {
     }
     
     var formattedDate: String {
+        ChatSession.dateFormatter.string(from: updatedAt)
+    }
+
+    /// Reused across all rows; `DateFormatter` is expensive to allocate and was
+    /// previously rebuilt on every render of every sidebar row.
+    private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
-        return formatter.string(from: updatedAt)
-    }
+        return formatter
+    }()
 }
 
 enum SessionCreationResult {
@@ -40,12 +46,27 @@ class ChatSessionManager: ObservableObject {
     @Published var currentSession: ChatSession?
     
     private let databaseManager = DatabaseManager.shared
-    
+
+    /// Cached message count per session id. Refreshed in bulk on `loadSessions()`
+    /// and nudged incrementally via `markSessionHasMessages`, so the sidebar no
+    /// longer issues one SQLite query per session on every SwiftUI render pass.
+    @Published private var messageCounts: [String: Int] = [:]
+
     // Filtered sessions - only show sessions with messages (like ChatGPT)
     var displayedSessions: [ChatSession] {
-        return sessions.filter { session in
-            let messages = databaseManager.getMessages(for: session.id)
-            return messages.count > 0
+        return sessions.filter { (messageCounts[$0.id] ?? 0) > 0 }
+    }
+
+    /// True when a session has no stored messages (used to reuse empty chats).
+    private func isEmptySession(_ session: ChatSession) -> Bool {
+        (messageCounts[session.id] ?? 0) == 0
+    }
+
+    /// Marks a session as having at least one message without a DB round-trip.
+    /// Call after persisting a message so the sidebar reveals the session.
+    func markSessionHasMessages(_ sessionId: String) {
+        if (messageCounts[sessionId] ?? 0) == 0 {
+            messageCounts[sessionId] = 1
         }
     }
     
@@ -60,6 +81,7 @@ class ChatSessionManager: ObservableObject {
     
     func loadSessions() {
         sessions = databaseManager.getAllChatSessions()
+        messageCounts = databaseManager.messageCounts()
         if currentSession == nil && !sessions.isEmpty {
             currentSession = sessions.first
         }
@@ -211,10 +233,7 @@ class ChatSessionManager: ObservableObject {
     // Get or create a new empty chat (ChatGPT style)
     func getOrCreateNewChat() -> ChatSession {
         // Look for existing empty chat (no messages)
-        if let emptyChat = sessions.first(where: { session in
-            let messages = databaseManager.getMessages(for: session.id)
-            return messages.count == 0
-        }) {
+        if let emptyChat = sessions.first(where: { isEmptySession($0) }) {
             currentSession = emptyChat
             return emptyChat
         }

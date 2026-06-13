@@ -314,6 +314,29 @@ class DatabaseManager {
             print("Delete all messages error: \(error)")
         }
     }
+
+    /// Number of stored messages per session, keyed by session id.
+    /// Computed with a single grouped COUNT(*) so callers can cache the result
+    /// instead of fetching full message rows per session on every UI pass.
+    func messageCounts() -> [String: Int] {
+        do {
+            let countColumn = messageId.count
+            let query = chatMessages
+                .select(messageSessionId, countColumn)
+                .group(messageSessionId)
+
+            var counts: [String: Int] = [:]
+            if let rows = try db?.prepare(query) {
+                for row in rows {
+                    counts[row[messageSessionId]] = row[countColumn]
+                }
+            }
+            return counts
+        } catch {
+            print("Message counts error: \(error)")
+            return [:]
+        }
+    }
     
     // MARK: - Documents
     
