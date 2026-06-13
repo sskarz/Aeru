@@ -228,11 +228,42 @@ class LLM: ObservableObject {
         }
     }
 
-    private func handleError(_ error: Error, sessionId: String, sources: [WebSearchResult]? = nil) {
+    private func handleError(
+        _ error: Error,
+        sessionId: String,
+        for chatSession: ChatSession,
+        sessionManager: ChatSessionManager,
+        isFirstMessage: Bool,
+        sources: [WebSearchResult]? = nil
+    ) {
         updateIsResponding()
         let message = ChatMessage(text: userFacingMessage(for: error), isUser: false, sources: sources)
         chatMessages.append(message)
         databaseManager.saveMessage(message, sessionId: sessionId)
+        titleSessionOnFailure(for: chatSession, sessionManager: sessionManager, isFirstMessage: isFirstMessage)
+    }
+
+    /// When the first message of a chat fails, the model never produced a
+    /// response to title from — so derive a title locally from the user's query.
+    /// This keeps the session from retaining an empty title, which otherwise
+    /// collides with the untitled-session dedup and makes "New Chat" a no-op.
+    private func titleSessionOnFailure(
+        for chatSession: ChatSession,
+        sessionManager: ChatSessionManager,
+        isFirstMessage: Bool
+    ) {
+        guard isFirstMessage, chatSession.title.isEmpty else { return }
+        sessionManager.updateSessionTitleIfEmpty(chatSession, with: titleFromQuery(userLLMQuery))
+    }
+
+    /// Builds a concise title from the user's query without invoking the model
+    /// (the model just failed/was unavailable, so a local heuristic is used).
+    private func titleFromQuery(_ query: String) -> String {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "New Chat" }
+        let title = trimmed.split(whereSeparator: { $0.isWhitespace }).prefix(6).joined(separator: " ")
+        guard title.count > 40 else { return title }
+        return String(title.prefix(40)).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     /// Maps the iOS 27 Foundation Models error types to user-friendly text.
@@ -297,6 +328,7 @@ class LLM: ObservableObject {
             let message = ChatMessage(text: text, isUser: false, sources: sources)
             chatMessages.append(message)
             databaseManager.saveMessage(message, sessionId: sessionId)
+            titleSessionOnFailure(for: chatSession, sessionManager: sessionManager, isFirstMessage: isFirstMessage)
             return
         }
 
@@ -318,10 +350,12 @@ class LLM: ObservableObject {
                                      sources: sources, isFirstMessage: isFirstMessage)
                 saveTranscript(refreshed.transcript, sessionId: sessionId)
             } catch {
-                handleError(error, sessionId: sessionId, sources: sources)
+                handleError(error, sessionId: sessionId, for: chatSession,
+                            sessionManager: sessionManager, isFirstMessage: isFirstMessage, sources: sources)
             }
         } catch {
-            handleError(error, sessionId: sessionId, sources: sources)
+            handleError(error, sessionId: sessionId, for: chatSession,
+                        sessionManager: sessionManager, isFirstMessage: isFirstMessage, sources: sources)
         }
     }
 
