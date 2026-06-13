@@ -25,6 +25,7 @@ struct AeruView: View {
     @StateObject private var sessionManager = ChatSessionManager()
     @StateObject private var networkConnectivity = NetworkConnectivity()
     @StateObject private var textToSpeechManager = TextToSpeechManager()
+    @StateObject private var modelManager = ModelAvailabilityManager()
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
     
@@ -75,6 +76,40 @@ struct AeruView: View {
         _ = sessionManager.getOrCreateNewChat()
     }
     
+    @ViewBuilder
+    private var modelStatusBanner: some View {
+        switch modelManager.status {
+        case .preparing:
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("On-device AI is still downloading. Responses will work once it's ready.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        case .unsupported(let message):
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text(message)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        case .checking, .ready:
+            EmptyView()
+        }
+    }
+
     private var inputBar: some View {
         HStack(spacing: UIDevice.current.userInterfaceIdiom == .pad ? 16 : 12) {
             // Document upload button
@@ -130,6 +165,8 @@ struct AeruView: View {
                 // Main chat area (gets pushed by sidebar)
                 NavigationStack {
                     VStack(spacing: 0) {
+                        modelStatusBanner
+
                         // Chat content
                         if let currentSession = sessionManager.currentSession {
                             chatContentView(for: currentSession)
@@ -137,6 +174,7 @@ struct AeruView: View {
                             emptyStateView
                         }
                     }
+                    .animation(.easeInOut(duration: 0.3), value: modelManager.status)
                     .navigationTitle(sessionManager.currentSession?.displayTitle ?? "Aeru")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -215,6 +253,7 @@ struct AeruView: View {
             }
         }
         .onAppear {
+            modelManager.start()
             // Defer heavy initialization to avoid blocking UI
             Task {
                 // Wait for sessions to load from database first

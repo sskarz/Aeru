@@ -119,7 +119,4 @@ class RAGModel {
             print("Neighbor \(index + 1): Score \(neighbor.1), Text: \(String(neighbor.0.prefix(100)))...")
         }
     }
-    
-    
 }
-

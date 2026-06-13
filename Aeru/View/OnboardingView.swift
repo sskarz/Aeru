@@ -10,10 +10,11 @@ import Foundation
 
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var modelManager = ModelAvailabilityManager()
     @State private var currentPage = 0
     @State private var showingWelcome = true
-    
-    private let totalPages = 4
+
+    private let totalPages = 5
     
     var body: some View {
         ZStack {
@@ -30,6 +31,8 @@ struct OnboardingView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: showingWelcome)
         .animation(.easeInOut(duration: 0.3), value: currentPage)
+        .onAppear { modelManager.start() }
+        .onDisappear { modelManager.stop() }
     }
     
     private var welcomeScreen: some View {
@@ -113,6 +116,7 @@ struct OnboardingView: View {
                 documentUploadPage.tag(1)
                 webSearchPage.tag(2)
                 settingsPage.tag(3)
+                modelReadinessPage.tag(4)
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .never))
@@ -141,7 +145,7 @@ struct OnboardingView: View {
                 }
                 
                 Spacer()
-                
+
                 Button(action: {
                     if currentPage < totalPages - 1 {
                         withAnimation {
@@ -151,24 +155,47 @@ struct OnboardingView: View {
                         completeOnboarding()
                     }
                 }) {
-                    Text(currentPage < totalPages - 1 ? "Next" : "Done")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(width: 100, height: 50)
-                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12.0))
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(LinearGradient(
-                                    colors: [.blue, .purple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ))
-                        )
+                    Group {
+                        if isLastPage && isWaitingForModel {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .tint(.white)
+                                    .controlSize(.small)
+                                Text("Preparing")
+                            }
+                        } else {
+                            Text(primaryButtonTitle)
+                        }
+                    }
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(width: 130, height: 50)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12.0))
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(LinearGradient(
+                                colors: isLastPage && isWaitingForModel
+                                    ? [.gray, .gray.opacity(0.7)]
+                                    : [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                    )
                 }
+                .disabled(isLastPage && isWaitingForModel)
             }
             .padding(.horizontal, 40)
-            .padding(.bottom, 50)
+            .padding(.bottom, isLastPage && isWaitingForModel ? 16 : 50)
+
+            if isLastPage && isWaitingForModel {
+                Button("Skip for now") {
+                    completeOnboarding()
+                }
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 30)
+            }
         }
     }
     
@@ -364,6 +391,109 @@ struct OnboardingView: View {
         .padding(.horizontal, 40)
     }
     
+    // MARK: - Model readiness
+
+    private var isLastPage: Bool { currentPage == totalPages - 1 }
+
+    private var isWaitingForModel: Bool {
+        switch modelManager.status {
+        case .checking, .preparing: return true
+        case .ready, .unsupported:  return false
+        }
+    }
+
+    private var primaryButtonTitle: String {
+        if isLastPage {
+            if case .unsupported = modelManager.status { return "Continue" }
+            return "Done"
+        }
+        return "Next"
+    }
+
+    private var modelReadinessPage: some View {
+        VStack(spacing: 32) {
+            VStack(spacing: 16) {
+                statusIcon
+
+                Text(statusTitle)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+
+                Text(statusMessage)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+
+            if case .preparing = modelManager.status {
+                VStack(spacing: 12) {
+                    FeatureRow(
+                        icon: "wifi",
+                        title: "Stay Connected",
+                        description: "Keep Aeru open on Wi-Fi while the models download",
+                        color: .blue
+                    )
+                    FeatureRow(
+                        icon: "character.bubble",
+                        title: "Match Your Languages",
+                        description: "In Settings, make sure your Siri language matches your device language",
+                        color: .purple
+                    )
+                }
+                .padding(.horizontal, 20)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 40)
+        .padding(.top, 20)
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch modelManager.status {
+        case .checking, .preparing:
+            ProgressView()
+                .controlSize(.large)
+                .frame(width: 60, height: 60)
+                .glassEffect(.regular)
+        case .ready:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.green)
+                .glassEffect(.regular)
+        case .unsupported:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.orange)
+                .glassEffect(.regular)
+        }
+    }
+
+    private var statusTitle: String {
+        switch modelManager.status {
+        case .checking:    return "Checking On-Device AI"
+        case .preparing:   return "Preparing On-Device AI"
+        case .ready:       return "You're All Set!"
+        case .unsupported: return "On-Device AI Unavailable"
+        }
+    }
+
+    private var statusMessage: String {
+        switch modelManager.status {
+        case .checking:
+            return "Verifying that Apple Intelligence is ready on your device…"
+        case .preparing:
+            return "Apple is downloading the on-device AI models. This can take a few minutes the first time. You can start using Aeru once it's done."
+        case .ready:
+            return "The on-device AI model is downloaded and ready to go. Enjoy using Aeru!"
+        case .unsupported(let message):
+            return message
+        }
+    }
+
     private func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
         NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
