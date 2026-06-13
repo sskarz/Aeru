@@ -2,15 +2,9 @@
 //  ModelAvailabilityManager.swift
 //  Aeru
 //
-//  Tracks whether the on-device Foundation model is actually usable.
-//
-//  Why a probe instead of just reading availability?
-//  `SystemLanguageModel.default.availability` reports `.available` even when the
-//  safety model's assets (com.apple.fm.language.instruct_300m.safety) haven't
-//  finished downloading. When that happens the first real prompt fails deep in
-//  the framework with `promptTemplateNotFound` (surfaced as GenerationError -1).
-//  The only reliable signal is to run a tiny throwaway generation and see if it
-//  actually succeeds.
+//  Tracks whether the on-device Foundation model is usable, driven by
+//  SystemLanguageModel.default.availability. Polls while the model is still
+//  downloading so the UI can reflect readiness without the user reopening the app.
 //
 
 import Foundation
@@ -23,7 +17,7 @@ final class ModelAvailabilityManager: ObservableObject {
     enum Status: Equatable {
         case checking
         case ready
-        case preparing          // assets still downloading or safety model not ready
+        case preparing          // assets still downloading
         case unsupported(String) // device ineligible / Apple Intelligence off
     }
 
@@ -53,7 +47,7 @@ final class ModelAvailabilityManager: ObservableObject {
 
     private func monitor() async {
         while !Task.isCancelled {
-            let newStatus = await probe()
+            let newStatus = currentStatus()
             if newStatus != status {
                 status = newStatus
             }
@@ -66,10 +60,10 @@ final class ModelAvailabilityManager: ObservableObject {
         }
     }
 
-    private func probe() async -> Status {
+    private func currentStatus() -> Status {
         switch SystemLanguageModel.default.availability {
         case .available:
-            break
+            return .ready
         case .unavailable(let reason):
             switch reason {
             case .deviceNotEligible:
@@ -82,22 +76,6 @@ final class ModelAvailabilityManager: ObservableObject {
                 return .preparing
             }
         @unknown default:
-            break
-        }
-
-        // availability says `.available`, but it lies about the safety model.
-        // Ground-truth check: attempt a 1-token generation.
-        let session = LanguageModelSession {
-            "You are a helpful assistant."
-        }
-        do {
-            _ = try await session.respond(
-                to: "Hi",
-                options: GenerationOptions(maximumResponseTokens: 1)
-            )
-            return .ready
-        } catch {
-            // Safety template missing / -1 / not-ready — assets aren't usable yet.
             return .preparing
         }
     }

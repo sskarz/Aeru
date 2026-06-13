@@ -57,16 +57,46 @@ class LLM: ObservableObject {
         return rag
     }
 
+    private static let instructions = "You are a helpful, accurate, and concise AI assistant."
+
     private func getSessionForChat(_ sessionId: String) -> LanguageModelSession {
         if let existing = sessions[sessionId] { return existing }
-        // LanguageModelSession(transcript:) causes promptTemplateNotFound in the
-        // safety model (iOS 26 beta bug) — always create fresh sessions instead.
-        let session = LanguageModelSession {
-            "You are a helpful, accurate, and concise AI assistant."
+        // Rehydrate the model's conversation memory from a saved transcript when
+        // one exists, so follow-up questions keep context across app launches.
+        let session: LanguageModelSession
+        if let saved = loadTranscript(for: sessionId) {
+            session = LanguageModelSession(transcript: saved)
+        } else {
+            session = LanguageModelSession { Self.instructions }
         }
         session.prewarm()
         sessions[sessionId] = session
         return session
+    }
+
+    /// Persists the model's transcript so its conversation memory survives launches.
+    private func saveTranscript(_ transcript: Transcript, sessionId: String) {
+        do {
+            let data = try JSONEncoder().encode(transcript)
+            guard let json = String(data: data, encoding: .utf8) else { return }
+            databaseManager.saveTranscriptJSON(json, sessionId: sessionId)
+        } catch {
+            print("Failed to encode transcript: \(error)")
+        }
+    }
+
+    private func loadTranscript(for sessionId: String) -> Transcript? {
+        guard let json = databaseManager.loadTranscriptJSON(for: sessionId),
+              !json.isEmpty,
+              let data = json.data(using: .utf8) else {
+            return nil
+        }
+        do {
+            return try JSONDecoder().decode(Transcript.self, from: data)
+        } catch {
+            print("Failed to decode transcript: \(error)")
+            return nil
+        }
     }
 
     func sessionHasDocuments(_ session: ChatSession) -> Bool {
@@ -276,6 +306,7 @@ class LLM: ObservableObject {
             await commitResponse(response, sessionId: sessionId,
                                  chatSession: chatSession, sessionManager: sessionManager,
                                  sources: sources, isFirstMessage: isFirstMessage)
+            saveTranscript(session.transcript, sessionId: sessionId)
         } catch LanguageModelError.contextSizeExceeded {
             // Context window full — condense to a fresh session and retry once.
             let refreshed = newSession(previousSession: session)
@@ -285,6 +316,7 @@ class LLM: ObservableObject {
                 await commitResponse(response, sessionId: sessionId,
                                      chatSession: chatSession, sessionManager: sessionManager,
                                      sources: sources, isFirstMessage: isFirstMessage)
+                saveTranscript(refreshed.transcript, sessionId: sessionId)
             } catch {
                 handleError(error, sessionId: sessionId, sources: sources)
             }
@@ -413,16 +445,16 @@ class LLM: ObservableObject {
         Title:
         """
 
-        let session = getSessionForChat(chatSession.id)
+        // Use a throwaway session so the title prompt never pollutes the
+        // chat's persisted conversation memory.
+        let session = LanguageModelSession { Self.instructions }
 
         do {
             let responseStream = session.streamResponse(to: prompt)
-            updateIsResponding()
             var fullResponse = ""
             for try await partial in responseStream {
                 fullResponse = partial.content
             }
-            updateIsResponding()
 
             let cleanTitle = fullResponse
                 .trimmingCharacters(in: .whitespacesAndNewlines)
