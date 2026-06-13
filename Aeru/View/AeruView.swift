@@ -13,7 +13,6 @@ import WebKit
 import UIKit
 import MarkdownUI
 import FoundationModels
-import Speech
 
 
 struct BrowserURL: Identifiable {
@@ -25,7 +24,6 @@ struct AeruView: View {
     @StateObject private var llm = LLM()
     @StateObject private var sessionManager = ChatSessionManager()
     @StateObject private var networkConnectivity = NetworkConnectivity()
-    @StateObject private var speechRecognitionManager = SpeechRecognitionManager()
     @StateObject private var textToSpeechManager = TextToSpeechManager()
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
@@ -40,7 +38,6 @@ struct AeruView: View {
     @State private var showSources: Bool = false
     @State private var sourcesToShow: [WebSearchResult] = []
     @State private var sourcesLoading: Bool = false
-    @State private var showVoiceConversation: Bool = false
     @FocusState private var isMessageFieldFocused: Bool
     
     
@@ -104,29 +101,23 @@ struct AeruView: View {
                     .disableAutocorrection(false)
                     .glassEffect(.regular.interactive())
                 
-                // Send/Voice button
+                // Send button
                 Button(action: {
                     let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                     impactFeedback.impactOccurred()
-                    
-                    if messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        speechRecognitionManager.stopRecording()
-                        startInstantVoiceConversation()
-                    } else {
-                        sendMessage()
-                    }
+                    sendMessage()
                 }) {
-                    Image(systemName: messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "waveform" : "arrow.up")
+                    Image(systemName: "arrow.up")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.secondary)
                         .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32, height: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32)
                         .glassEffect(.regular.interactive())
                         .background(
                             Circle()
-                                .fill(isModelResponding ? Color.gray.opacity(0.6) : Color.blue)
+                                .fill(isModelResponding || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray.opacity(0.6) : Color.blue)
                         )
                 }
-                .disabled(isModelResponding)
+                .disabled(isModelResponding || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 24 : 16)
@@ -268,40 +259,10 @@ struct AeruView: View {
         .sheet(item: $webBrowserURL) { browserURL in
             WebBrowserView(url: browserURL.url)
         }
-        .sheet(isPresented: $showVoiceConversation) {
-            if let currentSession = sessionManager.currentSession {
-                VoiceConversationView(
-                    llm: llm,
-                    speechRecognitionManager: speechRecognitionManager,
-                    textToSpeechManager: textToSpeechManager,
-                    currentSession: currentSession,
-                    sessionManager: sessionManager
-                )
-            }
-        }
         .alert("No Internet Connection", isPresented: $showConnectivityAlert) {
             Button("OK") { }
         } message: {
             Text("Please turn on cellular or WiFi to use web search functionality.")
-        }
-        .alert("Speech Recognition Error", isPresented: $speechRecognitionManager.hasError) {
-            Button("OK") { 
-                speechRecognitionManager.clearError()
-            }
-        } message: {
-            Text(speechRecognitionManager.errorMessage)
-        }
-        .onChange(of: speechRecognitionManager.recognizedText) { oldValue, newValue in
-            // Only handle STT in main view when voice conversation is not active
-            if !showVoiceConversation && !newValue.isEmpty {
-                messageText = newValue
-            }
-        }
-        .onChange(of: speechRecognitionManager.isRecording) { oldValue, newValue in
-            // Only handle STT cleanup in main view when voice conversation is not active
-            if !showVoiceConversation && !newValue && !speechRecognitionManager.recognizedText.isEmpty {
-                speechRecognitionManager.clearRecognizedText()
-            }
         }
         .onDisappear {
             textToSpeechManager.stopSpeaking()
@@ -443,28 +404,6 @@ struct AeruView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    
-    private func handleVoiceButtonTap() {
-        if speechRecognitionManager.isRecording {
-            speechRecognitionManager.stopRecording()
-        } else {
-            isMessageFieldFocused = false
-            speechRecognitionManager.startRecording()
-        }
-    }
-    
-    private func startInstantVoiceConversation() {
-        // Dismiss keyboard
-        isMessageFieldFocused = false
-        
-        // Show voice conversation modal and start live mode immediately
-        showVoiceConversation = true
-        
-        // Small delay to ensure modal is presented before starting live mode
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            // The VoiceConversationView will auto-start live mode on appear
-        }
-    }
     
     private func sendMessage() {
         let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)

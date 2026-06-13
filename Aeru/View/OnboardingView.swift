@@ -13,7 +13,7 @@ struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var showingWelcome = true
     
-    private let totalPages = 5
+    private let totalPages = 4
     
     var body: some View {
         ZStack {
@@ -58,7 +58,7 @@ struct OnboardingView: View {
                 }
                 .multilineTextAlignment(.center)
                 
-                Text("Your intelligent AI assistant with voice interaction, document processing, and web search capabilities")
+                Text("Your intelligent AI assistant with document processing, web search, and on-device AI capabilities")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -110,10 +110,9 @@ struct OnboardingView: View {
             // Content
             TabView(selection: $currentPage) {
                 chatModesPage.tag(0)
-                voiceFeaturesPage.tag(1)
-                documentUploadPage.tag(2)
-                webSearchPage.tag(3)
-                settingsPage.tag(4)
+                documentUploadPage.tag(1)
+                webSearchPage.tag(2)
+                settingsPage.tag(3)
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .never))
@@ -212,54 +211,6 @@ struct OnboardingView: View {
                     title: "Web Search",
                     description: "AI responses enhanced with real-time web information",
                     color: .orange
-                )
-            }
-            .padding(.horizontal, 20)
-            
-            Spacer()
-        }
-        .padding(.horizontal, 40)
-    }
-    
-    private var voiceFeaturesPage: some View {
-        VStack(spacing: 32) {
-            VStack(spacing: 16) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.purple)
-                    .glassEffect(.regular)
-                
-                Text("Voice Interaction")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .multilineTextAlignment(.center)
-                
-                Text("Hands-free conversations with your AI assistant")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            
-            VStack(spacing: 20) {
-                FeatureRow(
-                    icon: "mic.fill",
-                    title: "Speech-to-Text",
-                    description: "Speak your messages instead of typing",
-                    color: .purple
-                )
-                
-                FeatureRow(
-                    icon: "speaker.wave.2.fill",
-                    title: "Text-to-Speech",
-                    description: "Listen to AI responses with natural voice synthesis",
-                    color: .indigo
-                )
-                
-                FeatureRow(
-                    icon: "phone.circle.fill",
-                    title: "Live Voice Mode",
-                    description: "Continuous voice conversations like talking to a person",
-                    color: .pink
                 )
             }
             .padding(.horizontal, 20)
