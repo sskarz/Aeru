@@ -17,32 +17,47 @@ struct WebSearchResult: Codable {
 
 class WebSearchService {
     private let session = URLSession.shared
-    
+
+    /// How many usable sources we want to feed the model.
+    private let targetSourceCount = 3
+    /// How many search results to parse as candidates. We over-fetch because some
+    /// hosts (paywalls, Google News, anti-bot) block scraping and yield nothing,
+    /// so parsing only 3 often leaves us with fewer after failures.
+    private let maxCandidates = 8
+    /// Minimum extracted length for a scrape to count as a usable source.
+    private let minUsableContentLength = 200
+
     // Searches and scrapes websites, returns webResults to add to LLM context
     func searchAndScrape(query: String) async -> [WebSearchResult] {
         do {
-            // Get search results from DuckDuckGo search engine
+            // Get search result candidates from DuckDuckGo search engine
             let searchResults = try await performSearch(query: query)
-            
-            // Scrape each website content
+
+            // Scrape candidates until we have enough usable sources, skipping any
+            // that get blocked or return no meaningful content.
             var webResults: [WebSearchResult] = []
-            
+
             for (index, result) in searchResults.enumerated() {
+                if webResults.count >= targetSourceCount { break }
+
                 // Add delay between requests to be respectful
                 if index > 0 {
                     try await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
                 }
-                
-                if let scrapedContent = await scrapeWebsite(url: result.url) {
-                    let webResult = WebSearchResult(
-                        title: scrapedContent.pageTitle.isEmpty ? result.title : scrapedContent.pageTitle,
-                        url: result.url,
-                        content: scrapedContent.content
-                    )
-                    webResults.append(webResult)
+
+                guard let scrapedContent = await scrapeWebsite(url: result.url),
+                      scrapedContent.content.count >= minUsableContentLength else {
+                    continue
                 }
+
+                let webResult = WebSearchResult(
+                    title: scrapedContent.pageTitle.isEmpty ? result.title : scrapedContent.pageTitle,
+                    url: result.url,
+                    content: scrapedContent.content
+                )
+                webResults.append(webResult)
             }
-            
+
             return webResults
         } catch {
             print("Web search error: \(error)")
@@ -76,7 +91,7 @@ class WebSearchService {
             if line.contains("result__a") && line.contains("href=") {
                 if let result = parseResultLine(line) {
                     results.append(result)
-                    if results.count >= 3 {
+                    if results.count >= maxCandidates {
                         break
                     }
                 }
@@ -119,7 +134,7 @@ class WebSearchService {
             if line.contains("href=") && (line.contains("http://") || line.contains("https://")) {
                 if let result = parseAnyLinkLine(line) {
                     results.append(result)
-                    if results.count >= 3 {
+                    if results.count >= maxCandidates {
                         break
                     }
                 }
@@ -393,7 +408,30 @@ class WebSearchService {
         if !currentChunk.isEmpty {
             chunks.append(currentChunk)
         }
-        
-        return chunks.filter { !$0.isEmpty }
+
+        // Hard cap: the sentence-based logic above can emit oversized chunks when a
+        // page lacks sentence delimiters (e.g. news index pages that are one long
+        // headline blob). Split any chunk that still exceeds maxTokens by words so
+        // we never overflow the model's context window.
+        let capped = chunks.flatMap { chunk -> [String] in
+            countTokens(in: chunk) <= maxTokens ? [chunk] : splitByWords(chunk, maxTokens: maxTokens)
+        }
+
+        return capped.filter { !$0.isEmpty }
+    }
+
+    /// Splits a single overlong string into windows of at most `maxTokens` words.
+    private func splitByWords(_ text: String, maxTokens: Int) -> [String] {
+        let words = text.split(whereSeparator: { $0.isWhitespace })
+        guard !words.isEmpty else { return [] }
+
+        var windows: [String] = []
+        var index = 0
+        while index < words.count {
+            let end = min(index + maxTokens, words.count)
+            windows.append(words[index..<end].joined(separator: " "))
+            index = end
+        }
+        return windows
     }
 }
