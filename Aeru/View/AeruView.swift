@@ -111,48 +111,50 @@ struct AeruView: View {
     }
 
     private var inputBar: some View {
-        HStack(spacing: UIDevice.current.userInterfaceIdiom == .pad ? 16 : 12) {
-            // Document upload button
-            Button(action: { 
-                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                impactFeedback.impactOccurred()
-                showKnowledgeBase.toggle() 
-            }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
-                    .glassEffect(.regular.interactive())
-            }
-            
-            // Text input area
-            HStack(spacing: 8) {
-                TextField("Type a message...", text: $messageText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .lineLimit(1...3)
-                    .textInputAutocapitalization(.sentences)
-                    .disableAutocorrection(false)
-                    .glassEffect(.regular.interactive())
-                
-                // Send button
+        GlassEffectContainer(spacing: UIDevice.current.userInterfaceIdiom == .pad ? 16 : 12) {
+            HStack(spacing: UIDevice.current.userInterfaceIdiom == .pad ? 16 : 12) {
+                // Document upload button
                 Button(action: {
                     let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                     impactFeedback.impactOccurred()
-                    sendMessage()
+                    showKnowledgeBase.toggle()
                 }) {
-                    Image(systemName: "arrow.up")
+                    Image(systemName: "plus")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32, height: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32)
+                        .foregroundColor(.primary)
+                        .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36, height: UIDevice.current.userInterfaceIdiom == .pad ? 44 : 36)
                         .glassEffect(.regular.interactive())
-                        .background(
-                            Circle()
-                                .fill(isModelResponding || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray.opacity(0.6) : Color.blue)
-                        )
                 }
-                .disabled(isModelResponding || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                // Text input area
+                HStack(spacing: 8) {
+                    TextField("Type a message...", text: $messageText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .lineLimit(1...3)
+                        .textInputAutocapitalization(.sentences)
+                        .disableAutocorrection(false)
+                        .glassEffect(.regular.interactive())
+
+                    // Send button
+                    Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        sendMessage()
+                    }) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32, height: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 32)
+                            .background(
+                                Circle()
+                                    .fill(isModelResponding || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray.opacity(0.6) : Color.blue)
+                            )
+                            .glassEffect(.regular.interactive())
+                    }
+                    .disabled(isModelResponding || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
         }
         .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .pad ? 24 : 16)
@@ -530,18 +532,16 @@ struct ChatBubbleView: View {
                         .textSelection(.enabled)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
                         .background(
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.blue)
                         )
-                        .foregroundColor(getUserTextColor())
+                        .foregroundColor(.white)
                 } else {
                     Markdown(message.text)
                         .textSelection(.enabled)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
                         .background(
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color(.systemGray5))
@@ -570,7 +570,6 @@ struct ChatBubbleView: View {
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
                                         .fill(Color.blue.opacity(0.1))
@@ -597,7 +596,6 @@ struct ChatBubbleView: View {
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
                                         .fill(Color.blue.opacity(0.1))
@@ -644,13 +642,7 @@ struct ChatBubbleView: View {
     }
     
     private func getUserTextColor() -> Color {
-        if selectedColorScheme == AppColorScheme.dark.rawValue {
-            return .white
-        } else if selectedColorScheme == AppColorScheme.system.rawValue {
-            return colorScheme == .dark ? .white : .secondary
-        } else {
-            return .secondary
-        }
+        return .white
     }
 }
 
@@ -745,7 +737,10 @@ struct SourcesView: View {
                             }
                         }
                         .padding(16)
-                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemGray6))
+                        )
                         .onTapGesture {
                             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                             impactFeedback.impactOccurred()
@@ -840,7 +835,6 @@ struct KnowledgeBaseView: View {
                     .background(useWebSearch ? Color.blue : Color.blue.opacity(0.1))
                     .foregroundColor(useWebSearch ? .white : .blue)
                     .cornerRadius(8)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 8.0))
                 }
                 
                 // Uploaded Documents
@@ -859,7 +853,6 @@ struct KnowledgeBaseView: View {
                             .frame(width: 120, height: 80)
                             .background(Color(.systemGray6))
                             .cornerRadius(8)
-                            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 8.0))
                         }
                     }
                 }
@@ -1005,8 +998,13 @@ struct WebView: UIViewRepresentable {
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
-        self.webView = webView
-        
+
+        // Defer the binding assignment so we don't mutate SwiftUI state
+        // during the view-building pass (which triggers reparenting warnings).
+        DispatchQueue.main.async {
+            self.webView = webView
+        }
+
         // Initialize the coordinator with the current URL
         context.coordinator.lastLoadedURL = url
         

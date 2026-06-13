@@ -2,8 +2,6 @@
 //  OnboardingView.swift
 //  Aeru
 //
-//  Created by Claude Code
-//
 
 import SwiftUI
 import Foundation

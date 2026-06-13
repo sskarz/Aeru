@@ -2,8 +2,6 @@
 //  DynamicLogoView.swift
 //  Aeru
 //
-//  Created by Claude Code
-//
 
 import SwiftUI
 

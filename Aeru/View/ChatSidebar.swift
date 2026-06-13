@@ -212,12 +212,12 @@ struct ChatSessionRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(session.displayTitle)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isSelected && !isSelectionMode ? .secondary : .primary)
+                    .foregroundColor(isSelected && !isSelectionMode ? .white : .primary)
                     .lineLimit(1)
-                
+
                 Text(session.formattedDate)
                     .font(.caption2)
-                    .foregroundColor(isSelected && !isSelectionMode ? .primary : .secondary)
+                    .foregroundColor(isSelected && !isSelectionMode ? .white.opacity(0.8) : .secondary)
             }
             
             Spacer()
@@ -242,10 +242,9 @@ struct ChatSessionRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16.0))
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(isSelected && !isSelectionMode ? Color.blue : Color.clear)
+                .fill(isSelected && !isSelectionMode ? Color.blue : Color(.systemGray6))
         )
         .contentShape(Rectangle())
         .onTapGesture {
