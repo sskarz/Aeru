@@ -76,7 +76,7 @@ class WebSearchService {
             if line.contains("result__a") && line.contains("href=") {
                 if let result = parseResultLine(line) {
                     results.append(result)
-                    if results.count >= 2 {
+                    if results.count >= 3 {
                         break
                     }
                 }
@@ -119,7 +119,7 @@ class WebSearchService {
             if line.contains("href=") && (line.contains("http://") || line.contains("https://")) {
                 if let result = parseAnyLinkLine(line) {
                     results.append(result)
-                    if results.count >= 2 {
+                    if results.count >= 3 {
                         break
                     }
                 }
@@ -316,7 +316,7 @@ class WebSearchService {
     }
     
     // Chunk text content into segments with token-based sizing and overlap
-    func chunkText(_ text: String, maxLength: Int = 1000, overlapTokens: Int = 100) -> [String] {
+    func chunkText(_ text: String, maxLength: Int = 1500, overlapTokens: Int = 100) -> [String] {
         // Convert maxLength from characters to approximate tokens (roughly 4 chars per token)
         let maxTokens = maxLength / 4
         

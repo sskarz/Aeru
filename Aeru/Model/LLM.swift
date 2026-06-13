@@ -392,6 +392,9 @@ class LLM: ObservableObject {
 
         let rag = getRagForSession(chatSession.id, collectionName: chatSession.collectionName)
         await rag.loadCollection()
+        // Restore the BM25 corpus from persisted chunks if this session was reopened
+        // after a relaunch (no-op when chunks were already added this session).
+        rag.seedCorpus(databaseManager.getAllChunks(for: chatSession.id))
         await rag.findLLMNeighbors(for: userLLMQuery)
 
         let contextItems = rag.neighbors.map { "- \($0.0)" }.joined(separator: "\n")

@@ -391,6 +391,24 @@ class DatabaseManager {
         }
     }
     
+    /// All chunk texts for a session, ordered, regardless of embedding status.
+    /// Used to rebuild the BM25 corpus when a persisted document session reopens.
+    func getAllChunks(for sessionId: String) -> [String] {
+        do {
+            let chunks = try db?.prepare(
+                documentChunks
+                    .join(documents, on: chunkDocumentId == documentId)
+                    .filter(documentSessionId == sessionId)
+                    .order(chunkIndex.asc)
+            )
+
+            return chunks?.map { $0[chunkText] } ?? []
+        } catch {
+            print("Get all chunks error: \(error)")
+            return []
+        }
+    }
+
     func markChunkAsEmbedded(_ chunkId: String) {
         do {
             let chunk = documentChunks.filter(self.chunkId == chunkId)
