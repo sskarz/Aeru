@@ -106,45 +106,47 @@ final class ModelProvider {
     /// instructions.
     func makeSession(for id: String, instructions: String) async throws -> LanguageModelSession {
         let definition = ModelCatalog.definition(for: id)
-        if definition.isSystemModel {
-            return LanguageModelSession(model: SystemLanguageModel.default) { instructions }
+        guard definition.isSystemModel else {
+            return try await coreAISession(for: definition, instructions: instructions)
         }
-        let model = try await coreAIModel(for: definition)
-        return LanguageModelSession(model: model) { instructions }
+        // Use the default (system) model initializer — passing `model:` explicitly
+        // is ambiguous between the framework's instructions-builder overloads.
+        return LanguageModelSession { instructions }
     }
 
     /// Build a session rehydrated from a saved transcript for the given model.
     func makeSession(for id: String, transcript: Transcript) async throws -> LanguageModelSession {
         let definition = ModelCatalog.definition(for: id)
-        if definition.isSystemModel {
-            return LanguageModelSession(model: SystemLanguageModel.default, transcript: transcript)
+        guard definition.isSystemModel else {
+            return try await coreAISession(for: definition, transcript: transcript)
         }
-        let model = try await coreAIModel(for: definition)
-        return LanguageModelSession(model: model, transcript: transcript)
+        return LanguageModelSession(transcript: transcript)
     }
 
-    /// Load (or reuse a cached) Core AI model instance for a third-party model.
+    /// Build a session backed by a third-party Core AI model.
     ///
     /// INTEGRATION POINT — enable once the Core AI Language Models package and a
-    /// sideloaded bundle are present:
+    /// sideloaded bundle are present. Replace the `throw` below with:
     ///
-    ///     if let cached = loadedCoreAIModels[definition.id] as? CoreAILanguageModel {
-    ///         return cached
-    ///     }
-    ///     guard let dir = ModelCatalog.sideloadDirectory(for: definition),
-    ///           bundleIsPresent(at: dir) else {
-    ///         throw ModelProviderError.notDownloaded(definition.id)
-    ///     }
-    ///     let model = try await CoreAILanguageModel(resourcesAt: dir)
-    ///     loadedCoreAIModels[definition.id] = model
-    ///     return model
+    ///     let model = try await loadCoreAIModel(for: definition)   // CoreAILanguageModel
+    ///     return LanguageModelSession(model: model) { instructions }
     ///
-    /// `coreAIModel` is declared to return the concrete model type once the
-    /// package is added; for now it throws so callers degrade gracefully.
-    private func coreAIModel(for definition: AIModelDefinition) async throws -> SystemLanguageModel {
-        // Until the Core AI package is wired in, third-party models can't be
-        // loaded — callers (LLM.executeQuery) gate on `availability` first, so
-        // this only fires as a safety net.
+    /// where `loadCoreAIModel` loads (and caches in `loadedCoreAIModels`) a
+    /// `CoreAILanguageModel(resourcesAt: ModelCatalog.sideloadDirectory(for:))`.
+    /// Because `CoreAILanguageModel` is a distinct type from `SystemLanguageModel`,
+    /// the `LanguageModelSession(model:)` call resolves unambiguously there.
+    private func coreAISession(for definition: AIModelDefinition, instructions: String) async throws -> LanguageModelSession {
+        // Callers (LLM.executeQuery) gate on `availability` first, so this only
+        // fires as a safety net until the Core AI package is wired in.
+        throw ModelProviderError.notDownloaded(definition.id)
+    }
+
+    /// Transcript-rehydrating counterpart of `coreAISession(for:instructions:)`.
+    /// INTEGRATION POINT — replace the `throw` with:
+    ///
+    ///     let model = try await loadCoreAIModel(for: definition)
+    ///     return LanguageModelSession(model: model, transcript: transcript)
+    private func coreAISession(for definition: AIModelDefinition, transcript: Transcript) async throws -> LanguageModelSession {
         throw ModelProviderError.notDownloaded(definition.id)
     }
 
