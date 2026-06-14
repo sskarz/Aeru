@@ -17,6 +17,13 @@ class LLM: ObservableObject {
 
     private var ragModels: [String: RAGModel] = [:]
     private var sessions: [String: LanguageModelSession] = [:]
+    private let modelProvider = ModelProvider()
+
+    /// The user's currently selected model id (mirrors `@AppStorage("selectedModelID")`
+    /// written by the picker). Falls back to the Apple default for any unknown value.
+    private var currentModelID: String {
+        UserDefaults.standard.string(forKey: "selectedModelID") ?? ModelCatalog.defaultModelID
+    }
 
     @Published var userLLMQuery: String = ""
     @Published var userLLMResponse: LanguageModelSession.ResponseStream<String>.Snapshot?
@@ -40,14 +47,29 @@ class LLM: ObservableObject {
         isResponding = session.isResponding
     }
 
-    private func newSession(previousSession: LanguageModelSession) -> LanguageModelSession {
+    private func newSession(previousSession: LanguageModelSession) async -> LanguageModelSession {
         let all = previousSession.transcript
         var condensed = [Transcript.Entry]()
         if let first = all.first {
             condensed.append(first)
             if all.count > 1, let last = all.last { condensed.append(last) }
         }
-        return LanguageModelSession(transcript: Transcript(entries: condensed))
+        let transcript = Transcript(entries: condensed)
+        // Rebuild against the selected model; fall back to the system model if
+        // the selected one can't be built (availability is gated upstream).
+        if let session = try? await modelProvider.makeSession(for: currentModelID, transcript: transcript) {
+            return session
+        }
+        return LanguageModelSession(transcript: transcript)
+    }
+
+    /// Called when the user picks a different model. Drops cached sessions and
+    /// loaded model instances so the next query rebuilds against the new model.
+    /// No-op while a response is streaming to avoid tearing a live session.
+    func modelSelectionChanged() {
+        guard !isResponding else { return }
+        sessions.removeAll()
+        modelProvider.invalidate()
     }
 
     private func getRagForSession(_ sessionId: String, collectionName: String) -> RAGModel {
@@ -59,15 +81,17 @@ class LLM: ObservableObject {
 
     private static let instructions = "You are a helpful, accurate, and concise AI assistant."
 
-    private func getSessionForChat(_ sessionId: String) -> LanguageModelSession {
+    private func getSessionForChat(_ sessionId: String) async -> LanguageModelSession {
         if let existing = sessions[sessionId] { return existing }
         // Rehydrate the model's conversation memory from a saved transcript when
         // one exists, so follow-up questions keep context across app launches.
         let session: LanguageModelSession
         if let saved = loadTranscript(for: sessionId) {
-            session = LanguageModelSession(transcript: saved)
+            session = (try? await modelProvider.makeSession(for: currentModelID, transcript: saved))
+                ?? LanguageModelSession(transcript: saved)
         } else {
-            session = LanguageModelSession { Self.instructions }
+            session = (try? await modelProvider.makeSession(for: currentModelID, instructions: Self.instructions))
+                ?? LanguageModelSession { Self.instructions }
         }
         session.prewarm()
         sessions[sessionId] = session
@@ -75,17 +99,25 @@ class LLM: ObservableObject {
     }
 
     /// Persists the model's transcript so its conversation memory survives launches.
+    /// Tags it with the current model id so it is only rehydrated under the same model.
     private func saveTranscript(_ transcript: Transcript, sessionId: String) {
         do {
             let data = try JSONEncoder().encode(transcript)
             guard let json = String(data: data, encoding: .utf8) else { return }
-            databaseManager.saveTranscriptJSON(json, sessionId: sessionId)
+            databaseManager.saveTranscriptJSON(json, modelID: currentModelID, sessionId: sessionId)
         } catch {
             print("Failed to encode transcript: \(error)")
         }
     }
 
     private func loadTranscript(for sessionId: String) -> Transcript? {
+        // Transcripts are tokenizer-specific: only rehydrate when the saved
+        // transcript was produced under the currently selected model. Sessions
+        // predating model tagging have an empty id and are treated as the default.
+        let storedID = databaseManager.loadTranscriptModelID(for: sessionId) ?? ""
+        let effectiveStoredID = storedID.isEmpty ? ModelCatalog.defaultModelID : storedID
+        guard effectiveStoredID == currentModelID else { return nil }
+
         guard let json = databaseManager.loadTranscriptJSON(for: sessionId),
               !json.isEmpty,
               let data = json.data(using: .utf8) else {
@@ -106,7 +138,9 @@ class LLM: ObservableObject {
     func switchToSession(_ session: ChatSession) {
         currentSessionId = session.id
         loadMessagesForCurrentSession()
-        _ = getSessionForChat(session.id)
+        // Warm the session in the background; building it may be async (loading a
+        // Core AI model). Callers don't need to wait — executeQuery awaits it too.
+        Task { _ = await getSessionForChat(session.id) }
     }
 
     func loadMessagesForCurrentSession() {
@@ -323,6 +357,21 @@ class LLM: ObservableObject {
         }
     }
 
+    /// Maps a model's unavailability to user-facing text. Apple reasons keep
+    /// their original wording; Core AI models surface a "not installed" message.
+    private func availabilityMessage(for reason: ModelProvider.Availability.Reason) -> String {
+        switch reason {
+        case .appleDeviceNotEligible:
+            return "Apple Intelligence requires iPhone 15 Pro or later."
+        case .appleIntelligenceNotEnabled:
+            return "Please enable Apple Intelligence in Settings > Apple Intelligence & Siri."
+        case .appleModelNotReady:
+            return "The on-device model is still preparing. Please wait a moment and try again."
+        case .notDownloaded:
+            return "This model isn't installed yet. Choose a downloaded model in Settings."
+        }
+    }
+
     private func executeQuery(
         prompt: String,
         sessionId: String,
@@ -331,24 +380,15 @@ class LLM: ObservableObject {
         sources: [WebSearchResult]? = nil,
         isFirstMessage: Bool
     ) async {
-        if case .unavailable(let reason) = SystemLanguageModel.default.availability {
-            let text: String
-            switch reason {
-            case .deviceNotEligible:
-                text = "Apple Intelligence requires iPhone 15 Pro or later."
-            case .appleIntelligenceNotEnabled:
-                text = "Please enable Apple Intelligence in Settings > Apple Intelligence & Siri."
-            case .modelNotReady:
-                text = "The on-device model is still preparing. Please wait a moment and try again."
-            }
-            let message = ChatMessage(text: text, isUser: false, sources: sources)
+        if case .unavailable(let reason) = modelProvider.availability(for: currentModelID) {
+            let message = ChatMessage(text: availabilityMessage(for: reason), isUser: false, sources: sources)
             chatMessages.append(message)
             databaseManager.saveMessage(message, sessionId: sessionId)
             titleSessionOnFailure(for: chatSession, sessionManager: sessionManager, isFirstMessage: isFirstMessage)
             return
         }
 
-        let session = getSessionForChat(chatSession.id)
+        let session = await getSessionForChat(chatSession.id)
         do {
             let response = try await stream(prompt, using: session)
             await commitResponse(response, sessionId: sessionId,
@@ -357,7 +397,7 @@ class LLM: ObservableObject {
             saveTranscript(session.transcript, sessionId: sessionId)
         } catch LanguageModelError.contextSizeExceeded {
             // Context window full — condense to a fresh session and retry once.
-            let refreshed = newSession(previousSession: session)
+            let refreshed = await newSession(previousSession: session)
             sessions[chatSession.id] = refreshed
             do {
                 let response = try await stream(prompt, using: refreshed)
@@ -501,11 +541,11 @@ class LLM: ObservableObject {
         Title:
         """
 
-        // Use a throwaway session so the title prompt never pollutes the
-        // chat's persisted conversation memory.
-        let session = LanguageModelSession { Self.instructions }
-
         do {
+            // Use a throwaway session (on the selected model) so the title prompt
+            // never pollutes the chat's persisted conversation memory.
+            let session = (try? await modelProvider.makeSession(for: currentModelID, instructions: Self.instructions))
+                ?? LanguageModelSession { Self.instructions }
             let responseStream = session.streamResponse(to: prompt)
             var fullResponse = ""
             for try await partial in responseStream {

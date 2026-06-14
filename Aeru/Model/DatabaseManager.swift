@@ -28,6 +28,9 @@ class DatabaseManager {
     private let sessionUpdatedAt = Expression<Date>("updated_at")
     private let sessionUseWebSearch = Expression<Bool>("use_web_search")
     private let transcriptEntryJSON = Expression<String>("transcript_entry_json")
+    // Model id (ModelCatalog) the saved transcript was produced under, so a
+    // transcript is never rehydrated into a different model's tokenizer.
+    private let transcriptModelID = Expression<String>("transcript_model_id")
     // Create a column for sessionTranscript
     // private let sessionTranscript = Expression<Transcript.Entry>(
     
@@ -80,6 +83,7 @@ class DatabaseManager {
                 t.column(sessionUpdatedAt)
                 t.column(sessionUseWebSearch, defaultValue: false)
                 t.column(transcriptEntryJSON, defaultValue: "")
+                t.column(transcriptModelID, defaultValue: "")
             })
             
             // Run migrations for existing tables
@@ -137,6 +141,11 @@ class DatabaseManager {
             if !columns.contains("transcript_entry_json") {
                 try db?.run("ALTER TABLE chat_sessions ADD COLUMN transcript_entry_json TEXT DEFAULT ''")
                 print("Migration: Added transcript_entry_json column to chat_sessions table")
+            }
+
+            if !columns.contains("transcript_model_id") {
+                try db?.run("ALTER TABLE chat_sessions ADD COLUMN transcript_model_id TEXT DEFAULT ''")
+                print("Migration: Added transcript_model_id column to chat_sessions table")
             }
         } catch {
             print("Migration error: \(error)")
@@ -229,11 +238,12 @@ class DatabaseManager {
         }
     }
     
-    func saveTranscriptJSON(_ jsonString: String, sessionId: String) {
+    func saveTranscriptJSON(_ jsonString: String, modelID: String, sessionId: String) {
         do {
             let sessionRow = chatSessions.filter(self.sessionId == sessionId)
             try db?.run(sessionRow.update(
                 transcriptEntryJSON <- jsonString,
+                transcriptModelID <- modelID,
                 sessionUpdatedAt <- Date()
             ))
         } catch {
@@ -253,7 +263,23 @@ class DatabaseManager {
             return nil
         }
     }
-    
+
+    /// The model id a saved transcript was produced under, or `nil`/empty if the
+    /// session predates model tagging. Used to avoid rehydrating a transcript
+    /// into a different model's tokenizer.
+    func loadTranscriptModelID(for sessionId: String) -> String? {
+        do {
+            let sessionRow = chatSessions.filter(self.sessionId == sessionId)
+            if let session = try db?.pluck(sessionRow) {
+                return session[transcriptModelID]
+            }
+            return nil
+        } catch {
+            print("Load transcript model id error: \(error)")
+            return nil
+        }
+    }
+
     // MARK: - Chat Messages
     
     func saveMessage(_ message: ChatMessage, sessionId: String) {

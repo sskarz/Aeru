@@ -27,6 +27,7 @@ struct AeruView: View {
     @StateObject private var textToSpeechManager = TextToSpeechManager()
     @StateObject private var modelManager = ModelAvailabilityManager()
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
+    @AppStorage("selectedModelID") private var selectedModelID = ModelCatalog.defaultModelID
     @Environment(\.colorScheme) private var colorScheme
     
     @State private var messageText: String = ""
@@ -211,6 +212,11 @@ struct AeruView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .onChange(of: selectedModelID) { _, _ in
+            // User picked a different model in Settings — drop cached sessions so
+            // the next query rebuilds against the new model.
+            llm.modelSelectionChanged()
+        }
         .onAppear {
             modelManager.start()
             // Defer heavy initialization to avoid blocking UI

@@ -28,6 +28,7 @@ enum AppColorScheme: String, CaseIterable {
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("colorScheme") private var selectedColorScheme = AppColorScheme.system.rawValue
+    @AppStorage("selectedModelID") private var selectedModelID = ModelCatalog.defaultModelID
     @State private var showOnboarding = false
     
     var body: some View {
@@ -78,7 +79,11 @@ struct SettingsView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                
+
+                // Model Section
+                modelSection
+                    .padding(.horizontal, 20)
+
                 // Tutorial Section
                 VStack(spacing: 16) {
                     Text("Help & Tutorial")
@@ -262,6 +267,89 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
+        }
+    }
+
+    // MARK: - Model Section
+
+    /// Family-grouped model picker. Selecting a model writes `selectedModelID`;
+    /// `AeruView` observes that key and tells the running `LLM` to rebuild
+    /// sessions against the new model.
+    @MainActor private var modelSection: some View {
+        VStack(spacing: 16) {
+            Text("Model")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 16) {
+                ForEach(ModelCatalog.byFamily) { group in
+                    VStack(spacing: 8) {
+                        Text(group.family.displayName.uppercased())
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        VStack(spacing: 8) {
+                            ForEach(group.models) { model in
+                                modelRow(model)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor private func modelRow(_ model: AIModelDefinition) -> some View {
+        let isSelected = model.id == selectedModelID
+        return Button {
+            selectedModelID = model.id
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundColor(isSelected ? .blue : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.displayName)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                    if let subtitle = subtitle(for: model) {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.systemGray6))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// A short status line: availability plus, for downloadable models, size.
+    @MainActor private func subtitle(for model: AIModelDefinition) -> String? {
+        // `ModelProvider` is lightweight; a throwaway instance is fine for a
+        // read-only availability check during rendering.
+        let availability = ModelProvider().availability(for: model.id)
+        if model.isSystemModel {
+            return availability == .available
+                ? "Provided by the system"
+                : "Unavailable — check Apple Intelligence settings"
+        }
+        let size = model.approxOnDiskBytes.map {
+            ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)
+        }
+        let installed = availability == .available
+        switch (installed, size) {
+        case (true, let s?):  return "Installed · \(s)"
+        case (true, nil):     return "Installed"
+        case (false, let s?): return "Not installed · \(s)"
+        case (false, nil):    return "Not installed"
         }
     }
 }
