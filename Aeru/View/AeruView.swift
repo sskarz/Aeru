@@ -43,6 +43,10 @@ struct AeruView: View {
     // Native split-view navigation state (replaces the hand-rolled drawer).
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
+    /// Visible height of the transcript scroll view, used to keep short
+    /// conversations top-aligned (iMessage style) instead of pinned to the
+    /// bottom by `.defaultScrollAnchor(.bottom)`.
+    @State private var scrollViewHeight: CGFloat = 0
 
     /// Cached once per view value instead of re-querying `UIDevice` at every
     /// use site throughout the body.
@@ -333,9 +337,15 @@ struct AeruView: View {
                 }
                 .padding(.horizontal, isPad ? 32 : 20)
                 .padding(.vertical, isPad ? 24 : 16)
+                // Fill at least the viewport and top-align, so a short
+                // conversation starts at the top (like iMessage). Once content
+                // exceeds the viewport this has no effect and the bottom anchor
+                // takes over.
+                .frame(minHeight: scrollViewHeight, alignment: .top)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollDismissesKeyboard(.immediately)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scrollViewHeight = $0 }
             // Keeps the latest content pinned to the bottom as it grows. This
             // makes streaming follow smoothly without firing an animated
             // `scrollTo` on every token, which previously stacked overlapping
